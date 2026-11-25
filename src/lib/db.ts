@@ -35,31 +35,31 @@ export const db = {
   async me(): Promise<{ slot: UserId; name: string } | null> {
     const s = await supabaseServer();
     const { data: claims } = await s.auth.getClaims();
-    const id = claims?.claims.sub;
-    if (!id) return null;
-    const { data } = await s.from("profiles").select("slot,name").eq("id", id).maybeSingle();
+    const email = claims?.claims.email?.toLowerCase();
+    if (!email) return null;
+    const { data } = await s.from("casa_members").select("slot,name").eq("email", email).maybeSingle();
     return data ? { slot: data.slot as UserId, name: data.name } : null;
   },
   async profiles(): Promise<{ slot: UserId; name: string }[]> {
     const s = await supabaseServer();
-    return check(await s.from("profiles").select("slot,name"), "profiles") as any;
+    return check(await s.from("casa_members").select("slot,name"), "members") as any;
   },
 
   /* ----- despesas ----- */
   async expenses(): Promise<Expense[]> {
     const s = await supabaseServer();
-    const rows = check(await s.from("expenses").select("*").order("date", { ascending: false }), "expenses");
+    const rows = check(await s.from("casa_expenses").select("*").order("date", { ascending: false }), "expenses");
     return (rows as any[]).map(toExpense);
   },
   async expense(id: string): Promise<Expense | null> {
     const s = await supabaseServer();
-    const { data } = await s.from("expenses").select("*").eq("id", id).maybeSingle();
+    const { data } = await s.from("casa_expenses").select("*").eq("id", id).maybeSingle();
     return data ? toExpense(data) : null;
   },
   async addExpense(e: Omit<Expense, "id" | "createdAt">) {
     const s = await supabaseServer();
     check(
-      await s.from("expenses").insert({
+      await s.from("casa_expenses").insert({
         description: e.description,
         category: e.category,
         amount: e.amount,
@@ -81,24 +81,24 @@ export const db = {
     if (e.date !== undefined) patch.date = e.date;
     if (e.paidBy !== undefined) patch.paid_by = e.paidBy;
     if (e.splitPct !== undefined) patch.split_pct = e.splitPct;
-    check(await s.from("expenses").update(patch).eq("id", id), "updateExpense");
+    check(await s.from("casa_expenses").update(patch).eq("id", id), "updateExpense");
   },
   async removeExpense(id: string) {
     const s = await supabaseServer();
-    const { data } = await s.from("expenses").select("file_path").eq("id", id).maybeSingle();
-    check(await s.from("expenses").delete().eq("id", id), "removeExpense");
-    if (data?.file_path) await s.storage.from("invoices").remove([data.file_path]);
+    const { data } = await s.from("casa_expenses").select("file_path").eq("id", id).maybeSingle();
+    check(await s.from("casa_expenses").delete().eq("id", id), "removeExpense");
+    if (data?.file_path) await s.storage.from("casa-invoices").remove([data.file_path]);
   },
 
   /* ----- acertos de contas ----- */
   async settlements(): Promise<Settlement[]> {
     const s = await supabaseServer();
-    return (check(await s.from("settlements").select("*"), "settlements") as any[]).map(toSettlement);
+    return (check(await s.from("casa_settlements").select("*"), "settlements") as any[]).map(toSettlement);
   },
   async addSettlement(x: { from: UserId; to: UserId; amount: number }) {
     const s = await supabaseServer();
     check(
-      await s.from("settlements").insert({ from_slot: x.from, to_slot: x.to, amount: x.amount }),
+      await s.from("casa_settlements").insert({ from_slot: x.from, to_slot: x.to, amount: x.amount }),
       "addSettlement",
     );
   },
@@ -108,8 +108,8 @@ export const db = {
     const s = await supabaseServer();
     const rows = check(
       await s
-        .from("lists")
-        .select("id,name,emoji,created_at,list_items(id,text,done,created_at)")
+        .from("casa_lists")
+        .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at)")
         .order("created_at"),
       "lists",
     ) as any[];
@@ -118,45 +118,45 @@ export const db = {
   async list(id: string): Promise<HomeList | null> {
     const s = await supabaseServer();
     const { data } = await s
-      .from("lists")
-      .select("id,name,emoji,created_at,list_items(id,text,done,created_at)")
+      .from("casa_lists")
+      .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at)")
       .eq("id", id)
       .maybeSingle();
     return data ? toList(data) : null;
   },
   async addList(name: string, emoji: string): Promise<string> {
     const s = await supabaseServer();
-    const row = check(await s.from("lists").insert({ name, emoji }).select("id").single(), "addList");
+    const row = check(await s.from("casa_lists").insert({ name, emoji }).select("id").single(), "addList");
     return (row as any).id;
   },
   async updateList(id: string, patch: { name: string; emoji: string }) {
     const s = await supabaseServer();
-    check(await s.from("lists").update(patch).eq("id", id), "updateList");
+    check(await s.from("casa_lists").update(patch).eq("id", id), "updateList");
   },
   async removeList(id: string) {
     const s = await supabaseServer();
-    check(await s.from("lists").delete().eq("id", id), "removeList");
+    check(await s.from("casa_lists").delete().eq("id", id), "removeList");
   },
   async addItems(listId: string, texts: string[]) {
     const s = await supabaseServer();
-    check(await s.from("list_items").insert(texts.map((text) => ({ list_id: listId, text }))), "addItems");
+    check(await s.from("casa_list_items").insert(texts.map((text) => ({ list_id: listId, text }))), "addItems");
   },
   async updateItem(itemId: string, patch: { text?: string; done?: boolean }) {
     const s = await supabaseServer();
-    check(await s.from("list_items").update(patch).eq("id", itemId), "updateItem");
+    check(await s.from("casa_list_items").update(patch).eq("id", itemId), "updateItem");
   },
   async removeItem(itemId: string) {
     const s = await supabaseServer();
-    check(await s.from("list_items").delete().eq("id", itemId), "removeItem");
+    check(await s.from("casa_list_items").delete().eq("id", itemId), "removeItem");
   },
   async clearDone(listId: string) {
     const s = await supabaseServer();
-    check(await s.from("list_items").delete().eq("list_id", listId).eq("done", true), "clearDone");
+    check(await s.from("casa_list_items").delete().eq("list_id", listId).eq("done", true), "clearDone");
   },
 };
 
 function toList(r: any): HomeList {
-  const items: ListItem[] = [...r.list_items]
+  const items: ListItem[] = [...r.casa_list_items]
     .sort((a: any, b: any) => a.created_at.localeCompare(b.created_at))
     .map((i: any) => ({ id: i.id, text: i.text, done: i.done }));
   return { id: r.id, name: r.name, emoji: r.emoji, items, createdAt: r.created_at };

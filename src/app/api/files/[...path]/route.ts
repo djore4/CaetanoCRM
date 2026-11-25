@@ -6,7 +6,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 export async function GET(_: Request, ctx: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await ctx.params;
   const s = await supabaseServer();
-  const { data } = await s.storage.from("invoices").createSignedUrl(path.basename(parts.join("/")), 60);
+  const { data } = await s.storage.from("casa-invoices").createSignedUrl(path.basename(parts.join("/")), 60);
   if (!data?.signedUrl) return new NextResponse("Not found", { status: 404 });
   return NextResponse.redirect(data.signedUrl);
 }

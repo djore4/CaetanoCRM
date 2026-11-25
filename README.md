@@ -18,10 +18,17 @@ npm run dev                  # http://localhost:3000
 
 ## Base de dados (Supabase)
 
-1. Cria um projeto Supabase **dedicado** e aplica `supabase/migrations/*.sql`.
-2. Em *Authentication → Sign In / Providers* cria os 2 utilizadores (email + palavra-passe) e **desativa o registo público**.
-3. Os 2 primeiros utilizadores criados ficam com os lugares A e B (trigger em `auth.users`); RLS impede qualquer outro de ler ou escrever.
-4. As faturas ficam no bucket privado `invoices`; o browser carrega-as diretamente (limite de 4,5 MB do Vercel não se aplica).
+Tudo vive em tabelas `casa_*` e no bucket privado `casa-invoices` (migração em `supabase/migrations/`). Não há triggers em `auth.users`.
+
+**Quem tem acesso:** só os emails listados em `casa_members` (máx. 2, lugares `a` e `b`). Qualquer outro utilizador autenticado do projeto vê 0 linhas e não consegue escrever (RLS). Para configurar, no SQL editor:
+
+```sql
+insert into public.casa_members (email, slot, name) values
+  ('o-teu-email@exemplo.com', 'a', 'João'),
+  ('email-da-parceira@exemplo.com', 'b', 'Nome');   -- emails em minúsculas
+```
+
+Cada pessoa precisa de uma conta em *Authentication → Users* (email + palavra-passe, "Auto Confirm User" ligado). Contas que já existam no projeto servem.
 
 ## Deploy (Vercel)
 

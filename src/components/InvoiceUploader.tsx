@@ -35,7 +35,7 @@ export function InvoiceUploader({ aiEnabled }: { aiEnabled: boolean }) {
       const body: Blob = isPdf ? file : await shrinkImage(file);
       const name = `${crypto.randomUUID()}.${isPdf ? "pdf" : "jpg"}`;
       const { error: upErr } = await supabaseBrowser()
-        .storage.from("invoices")
+        .storage.from("casa-invoices")
         .upload(name, body, { contentType: isPdf ? "application/pdf" : "image/jpeg" });
       if (upErr) throw upErr;
       setState("reading");

@@ -46,7 +46,7 @@ export async function analyzeInvoice(filePath: string) {
   if (!mime) redirect("/despesas/nova?erro=formato");
 
   const s = await supabaseServer();
-  const { data, error } = await s.storage.from("invoices").download(safe);
+  const { data, error } = await s.storage.from("casa-invoices").download(safe);
   if (error || !data) redirect("/despesas/nova?erro=ficheiro");
 
   const q = new URLSearchParams({ file: safe });
