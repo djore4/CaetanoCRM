@@ -30,3 +30,20 @@ export const dayLabel = (iso: string) =>
   });
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** "Hoje", "Ontem" ou "terça, 3 de dezembro". */
+export function dayHeading(iso: string) {
+  const d = new Date(iso + "T12:00:00");
+  const today = new Date();
+  const key = (x: Date) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  const y = new Date(today);
+  y.setDate(today.getDate() - 1);
+  if (key(d) === key(today)) return "Hoje";
+  if (key(d) === key(y)) return "Ontem";
+  return d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
+}
+
+export function greeting(date = new Date()) {
+  const h = date.getHours();
+  return h < 6 ? "Boa noite" : h < 13 ? "Bom dia" : h < 20 ? "Boa tarde" : "Boa noite";
+}

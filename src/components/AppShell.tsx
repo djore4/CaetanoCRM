@@ -1,16 +1,25 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { db } from "@/lib/db";
+import { greeting } from "@/lib/format";
 import { household, type Household } from "@/lib/users";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { Nav } from "./Nav";
+import { applyTheme, getThemePref } from "@/lib/theme";
+import type { UserId } from "@/lib/types";
+import { Fab, Nav } from "./Nav";
+import { Logo } from "./Icons";
+import { ProfileMenu } from "./ProfileMenu";
+import { ToastProvider } from "./Toast";
 
 type Status = "loading" | "out" | "nomember" | "in";
 
-const Ctx = createContext<Household | null>(null);
-export function useHousehold(): Household {
+export type AppCtx = Household & { slot: UserId; email: string; refresh: () => Promise<void> };
+
+const Ctx = createContext<AppCtx | null>(null);
+export function useHousehold(): AppCtx {
   const h = useContext(Ctx);
   if (!h) throw new Error("useHousehold fora do AppShell");
   return h;
@@ -21,80 +30,140 @@ const signOut = () => supabaseBrowser().auth.signOut();
 /** Em site estático não há servidor a proteger as páginas: o acesso aos dados é garantido pela RLS;
  *  aqui só decidimos o que mostrar (login, sem acesso, ou a app). */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ToastProvider>
+      <Shell>{children}</Shell>
+    </ToastProvider>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = (usePathname() || "/").replace(/\/$/, "") || "/";
   const onLogin = path === "/login";
   const [status, setStatus] = useState<Status>("loading");
   const [hh, setHh] = useState<Household | null>(null);
-  const [name, setName] = useState("");
+  const [me, setMe] = useState<{ slot: UserId; name: string; email: string } | null>(null);
+  const [sessionEmail, setSessionEmail] = useState("");
+
+  const load = useCallback(async () => {
+    const m = await db.me();
+    if (!m) {
+      setStatus("nomember");
+      return;
+    }
+    const h = await household();
+    setMe(m);
+    setHh(h);
+    setStatus("in");
+  }, []);
+
+  // tema: segue o sistema quando a preferência é "automático"
+  useEffect(() => {
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => getThemePref() === "system" && applyTheme("system");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const s = supabaseBrowser();
     let live = true;
-    async function sync(hasSession: boolean) {
-      if (!hasSession) {
-        if (live) {
-          setHh(null);
-          setStatus("out");
-        }
+    async function sync(email: string | null) {
+      if (!live) return;
+      setSessionEmail(email ?? "");
+      if (!email) {
+        setHh(null);
+        setStatus("out");
         return;
       }
       try {
-        const me = await db.me();
-        if (!live) return;
-        if (!me) return setStatus("nomember");
-        const h = await household();
-        if (!live) return;
-        setName(me.name);
-        setHh(h);
-        setStatus("in");
+        await load();
       } catch (e) {
         console.error(e);
         if (live) setStatus("out");
       }
     }
-    s.auth.getSession().then(({ data }) => sync(!!data.session));
+    s.auth.getSession().then(({ data }) => sync(data.session?.user.email ?? null));
     const { data: sub } = s.auth.onAuthStateChange((event, session) => {
-      if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return;
-      setTimeout(() => sync(!!session), 0); // não fazer chamadas ao Supabase dentro do callback
+      if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
+      setTimeout(() => sync(session?.user.email ?? null), 0); // não chamar o Supabase dentro do callback
     });
     return () => {
       live = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (status === "out" && !onLogin) router.replace("/login/");
     if (status === "in" && onLogin) router.replace("/");
   }, [status, onLogin, router]);
 
-  if (status === "loading") return <p className="min-h-dvh grid place-items-center text-muted">A carregar…</p>;
-  if (status === "out") return onLogin ? <>{children}</> : null;
-  if (status === "nomember")
-    return (
-      <div className="min-h-dvh grid place-items-center px-4">
-        <div className="card p-7 max-w-sm text-center space-y-3">
-          <p className="text-4xl">🔒</p>
-          <p className="font-semibold">Esta conta ainda não tem acesso.</p>
-          <p className="text-sm text-muted">O email tem de estar em casa_members (ver README).</p>
-          <button onClick={signOut} className="btn btn-ghost">Sair</button>
-        </div>
-      </div>
-    );
-  if (!hh || onLogin) return null;
+  if (status === "loading") return <Splash />;
+  if (status === "out") return onLogin ? <>{children}</> : <Splash />;
+  if (status === "nomember") return <NoAccess email={sessionEmail} />;
+  if (!hh || !me || onLogin) return <Splash />;
+
+  const ctx: AppCtx = { ...hh, slot: me.slot, email: me.email, refresh: load };
+  const hideFab = path.startsWith("/despesas/nova") || path.startsWith("/despesas/editar") || path.startsWith("/listas");
 
   return (
-    <Ctx.Provider value={hh}>
+    <Ctx.Provider value={ctx}>
       <Nav />
-      <div className="md:pl-56">
-        <header className="flex items-center justify-between px-4 md:px-8 pt-4">
-          <span className="md:hidden font-bold text-lg">🏡 Casa</span>
-          <span className="hidden md:block text-sm text-muted">Olá, {name}</span>
-          <button onClick={signOut} className="text-sm text-muted font-semibold">Sair</button>
+      <div className="md:pl-64">
+        <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/75 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 md:px-8">
+            <Link href="/" className="flex items-center gap-2.5 md:hidden">
+              <Logo className="h-8 w-8" />
+              <span className="text-lg font-bold tracking-tight">Casa</span>
+            </Link>
+            <p className="hidden text-sm text-muted md:block">
+              {greeting()}, <b className="font-semibold text-ink">{hh.users[me.slot].name}</b>
+            </p>
+            <ProfileMenu />
+          </div>
         </header>
-        <main className="mx-auto max-w-5xl px-4 md:px-8 py-5 pb-28 md:pb-10">{children}</main>
+        <main key={path} className="enter mx-auto max-w-5xl px-4 pb-36 pt-6 md:px-8 md:pb-14">
+          {children}
+        </main>
       </div>
+      {!hideFab && <Fab />}
     </Ctx.Provider>
+  );
+}
+
+function Splash() {
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <div className="flex flex-col items-center gap-4 anim-fade">
+        <div className="animate-pulse">
+          <Logo className="h-14 w-14" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoAccess({ email }: { email: string }) {
+  return (
+    <div className="grid min-h-dvh place-items-center px-4">
+      <div className="card enter w-full max-w-sm p-7 text-center">
+        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-soft text-2xl">🔒</div>
+        <h1 className="text-lg font-bold">Esta conta ainda não tem acesso</h1>
+        {email && (
+          <p className="mt-3 rounded-xl bg-soft px-3 py-2 text-sm">
+            Entraste como <b className="break-all">{email}</b>
+          </p>
+        )}
+        <p className="mt-3 text-sm text-muted">
+          O email tem de estar em <code className="text-ink">casa_members</code>. Se é a conta errada, sai e entra com
+          a certa.
+        </p>
+        <button onClick={signOut} className="btn btn-ghost mt-6 w-full">
+          Sair e entrar com outra conta
+        </button>
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
-import { useHousehold } from "@/components/AppShell";
-import { ExpenseForm } from "@/components/ExpenseForm";
 import { useAsync } from "@/lib/useAsync";
+import { useHousehold } from "@/components/AppShell";
+import { BackButton } from "@/components/BackButton";
+import { ExpenseForm } from "@/components/ExpenseForm";
+import { ErrorCard, Skeleton } from "@/components/Skeleton";
 
 export default function Editar() {
   return (
@@ -20,33 +21,37 @@ function EditarInner() {
   const id = useSearchParams().get("id") ?? "";
   const { users } = useHousehold();
   const { data: e, loading, error } = useAsync(() => db.expense(id), [id]);
-  if (error) return <div className="card p-4 text-sm text-red-500">Erro a carregar: {error}</div>;
-  if (loading) return <p className="text-muted">A carregar…</p>;
-  if (!e)
-    return (
-      <div className="card p-6 text-center">
-        Despesa não encontrada. <Link href="/despesas/" className="text-accent font-semibold">Voltar</Link>
-      </div>
-    );
 
   return (
-    <div className="max-w-xl mx-auto space-y-5">
-      <Link href="/despesas/" className="text-sm text-muted">← Voltar</Link>
-      <h1 className="text-2xl font-bold">Editar despesa</h1>
-      <ExpenseForm
-        users={users}
-        submitLabel="Guardar alterações"
-        d={{
-          id: e.id,
-          file: e.file,
-          description: e.description,
-          amount: String(e.amount).replace(".", ","),
-          date: e.date,
-          category: e.category,
-          paidBy: e.paidBy,
-          splitPct: e.splitPct,
-        }}
-      />
+    <div className="mx-auto max-w-xl space-y-5">
+      <BackButton href="/despesas/" label="Despesas" />
+      <h1 className="text-3xl font-bold tracking-tight">Editar despesa</h1>
+      {error ? (
+        <ErrorCard message={error} />
+      ) : loading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-56" />
+          <Skeleton className="h-48" />
+          <Skeleton className="h-64" />
+        </div>
+      ) : !e ? (
+        <div className="card p-8 text-center text-muted">Esta despesa já não existe.</div>
+      ) : (
+        <ExpenseForm
+          users={users}
+          submitLabel="Guardar alterações"
+          d={{
+            id: e.id,
+            file: e.file,
+            description: e.description,
+            amount: String(e.amount).replace(".", ","),
+            date: e.date,
+            category: e.category,
+            paidBy: e.paidBy,
+            splitPct: e.splitPct,
+          }}
+        />
+      )}
     </div>
   );
 }
