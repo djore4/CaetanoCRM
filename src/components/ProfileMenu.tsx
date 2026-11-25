@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { db } from "@/lib/db";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
+import { useInstall } from "@/lib/pwa";
 import { useHousehold } from "./AppShell";
 import { Avatar } from "./Avatar";
 import { Icon, type IconName } from "./Icons";
@@ -20,7 +21,9 @@ export function ProfileMenu() {
   const { users, slot, email } = useHousehold();
   const me = users[slot];
   const [open, setOpen] = useState(false);
-  const [modal, setModal] = useState<"name" | "password" | null>(null);
+  const [modal, setModal] = useState<"name" | "password" | "install" | null>(null);
+  const { state: installState, install } = useInstall();
+  const toast = useToast();
   const [theme, setTheme] = useState<ThemePref>("system");
   const ref = useRef<HTMLDivElement>(null);
 
@@ -37,7 +40,14 @@ export function ProfileMenu() {
     };
   }, [open]);
 
-  const openModal = (m: "name" | "password") => {
+  async function onInstall() {
+    if (installState === "prompt") {
+      setOpen(false);
+      if (await install()) toast("App instalada");
+    } else openModal("install");
+  }
+
+  const openModal = (m: "name" | "password" | "install") => {
     setOpen(false);
     setModal(m);
   };
@@ -72,6 +82,16 @@ export function ProfileMenu() {
           <div className="p-2">
             <MenuItem icon="pencil" label="Alterar nome" hint={me.name} onClick={() => openModal("name")} />
             <MenuItem icon="lock" label="Alterar palavra-passe" onClick={() => openModal("password")} />
+            {installState === "installed" ? (
+              <div className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-muted">
+                <span className="grid h-8 w-8 place-items-center rounded-xl bg-success/15 text-success">
+                  <Icon name="check" className="h-4 w-4" strokeWidth={2.4} />
+                </span>
+                App instalada neste dispositivo
+              </div>
+            ) : (
+              <MenuItem icon="download" label="Instalar app" hint="ecrã principal" onClick={onInstall} />
+            )}
           </div>
 
           <div className="border-t border-line p-3">
@@ -102,6 +122,9 @@ export function ProfileMenu() {
 
       <Modal open={modal === "name"} onClose={() => setModal(null)} title="Alterar nome">
         <NameForm onDone={() => setModal(null)} />
+      </Modal>
+      <Modal open={modal === "install"} onClose={() => setModal(null)} title="Instalar a app">
+        <InstallHelp ios={installState === "ios"} onDone={() => setModal(null)} />
       </Modal>
       <Modal open={modal === "password"} onClose={() => setModal(null)} title="Alterar palavra-passe">
         <PasswordForm onDone={() => setModal(null)} />
@@ -310,5 +333,60 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
         {busy ? "A alterar…" : "Alterar palavra-passe"}
       </button>
     </form>
+  );
+}
+
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent">{n}</span>
+      <span className="pt-0.5 text-sm leading-relaxed">{children}</span>
+    </li>
+  );
+}
+
+function InstallHelp({ ios, onDone }: { ios: boolean; onDone: () => void }) {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-4 rounded-2xl bg-soft p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/icons/icon-192.png`} alt="" className="h-14 w-14 rounded-2xl" />
+        <div>
+          <p className="font-bold">Casa</p>
+          <p className="text-sm text-muted">Abre em ecrã inteiro, como uma app, a partir do ecrã principal.</p>
+        </div>
+      </div>
+      {ios ? (
+        <ol className="space-y-3.5">
+          <Step n={1}>
+            Abre esta página no <b>Safari</b>.
+          </Step>
+          <Step n={2}>
+            Toca em <b>Partilhar</b>{" "}
+            <Icon name="share" className="inline h-4 w-4 -translate-y-0.5 text-accent" /> na barra do Safari.
+          </Step>
+          <Step n={3}>
+            Escolhe <b>Adicionar ao ecrã principal</b>{" "}
+            <Icon name="squarePlus" className="inline h-4 w-4 -translate-y-0.5 text-accent" /> e confirma em <b>Adicionar</b>.
+          </Step>
+        </ol>
+      ) : (
+        <ol className="space-y-3.5">
+          <Step n={1}>
+            Abre o menu do browser (<b>⋮</b> no Chrome, ou o ícone{" "}
+            <Icon name="download" className="inline h-4 w-4 -translate-y-0.5 text-accent" /> na barra de endereço).
+          </Step>
+          <Step n={2}>
+            Escolhe <b>Instalar app</b> ou <b>Adicionar ao ecrã principal</b>.
+          </Step>
+          <Step n={3}>
+            Confirma. A app <b>Casa</b> aparece junto das outras.
+          </Step>
+        </ol>
+      )}
+      <button type="button" className="btn btn-ghost w-full" onClick={onDone}>
+        Percebido
+      </button>
+    </div>
   );
 }
