@@ -6,11 +6,31 @@ export const dynamic = "force-dynamic";
 
 const EMOJIS = ["🛒", "🎄", "📌", "🎁", "🧹", "✈️", "🍽️", "🔧", "📝"];
 
-export default function Listas() {
-  const lists = db.lists();
+export default async function Listas() {
+  const lists = await db.lists();
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">Listas</h1>
+
+      {lists.length === 0 && (
+        <div className="card p-6 text-center space-y-4">
+          <p className="text-4xl">✅</p>
+          <p className="text-muted text-sm">Ainda não há listas. Começa por uma destas:</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {[
+              ["🛒", "Supermercado"],
+              ["🎄", "Compras de Natal"],
+              ["📌", "Pendentes"],
+            ].map(([emoji, name]) => (
+              <form key={name} action={createList}>
+                <input type="hidden" name="emoji" value={emoji} />
+                <input type="hidden" name="name" value={name} />
+                <button className="btn btn-ghost">{emoji} {name}</button>
+              </form>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {lists.map((l) => {

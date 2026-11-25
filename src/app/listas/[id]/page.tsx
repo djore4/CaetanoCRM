@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Lista({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const list = db.lists().find((l) => l.id === id);
+  const list = await db.list(id);
   if (!list) notFound();
 
   const todo = list.items.filter((i) => !i.done);
@@ -39,7 +39,7 @@ export default async function Lista({ params }: { params: Promise<{ id: string }
       ) : (
         <>
           <ul className="card divide-y divide-line">
-            {todo.map((i) => <ItemRow key={i.id} listId={list.id} item={i} />)}
+            {todo.map((i) => <ItemRow key={i.id} item={i} />)}
             {todo.length === 0 && <li className="p-4 text-center text-muted text-sm">Tudo feito 🎉</li>}
           </ul>
           {done.length > 0 && (
@@ -51,7 +51,7 @@ export default async function Lista({ params }: { params: Promise<{ id: string }
                 </form>
               </div>
               <ul className="card divide-y divide-line">
-                {done.map((i) => <ItemRow key={i.id} listId={list.id} item={i} />)}
+                {done.map((i) => <ItemRow key={i.id} item={i} />)}
               </ul>
             </>
           )}

@@ -12,15 +12,28 @@ App doméstica para duas pessoas: despesas partilhadas, conta corrente e listas.
 
 ```bash
 npm install
-cp .env.example .env.local   # opcional: chaves Anthropic / Splitwise
+cp .env.example .env.local   # URL + chave publicável do Supabase (+ ANTHROPIC_API_KEY opcional)
 npm run dev                  # http://localhost:3000
 ```
 
-Sem chaves, a app funciona com preenchimento manual. `DEMO_DATA=false` arranca sem dados de exemplo; `npm run reset-db` apaga os dados locais.
+## Base de dados (Supabase)
 
-## Estado do rascunho (o que ainda NÃO está feito)
+Tudo vive em tabelas `casa_*` e no bucket privado `casa-invoices` (migração em `supabase/migrations/`). Não há triggers em `auth.users`.
 
-- **Sem login**: o seletor João/Parceira no topo só escolhe quem está a "ver". Não é segurança.
-- **Persistência em ficheiro JSON** (`data/db.json`), isolada em `src/lib/db.ts`. Não serve para deploy em Vercel; o passo seguinte é Supabase (Postgres + Auth + Storage).
-- **Splitwise não testado** contra uma conta real; só cria despesas (não lê nem sincroniza o saldo de volta).
-- Sem editar despesas já guardadas (só apagar), sem despesas recorrentes, sem testes automáticos.
+**Quem tem acesso:** só os emails listados em `casa_members` (máx. 2, lugares `a` e `b`). Qualquer outro utilizador autenticado do projeto vê 0 linhas e não consegue escrever (RLS). Para configurar, no SQL editor:
+
+```sql
+insert into public.casa_members (email, slot, name) values
+  ('o-teu-email@exemplo.com', 'a', 'João'),
+  ('email-da-parceira@exemplo.com', 'b', 'Nome');   -- emails em minúsculas
+```
+
+Cada pessoa precisa de uma conta em *Authentication → Users* (email + palavra-passe, "Auto Confirm User" ligado). Contas que já existam no projeto servem.
+
+## Deploy (Vercel)
+
+Variáveis: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`.
+
+## Estado
+
+Splitwise foi substituído: o saldo é calculado na app a partir das despesas (pagador + divisão) e dos acertos. Ainda não testado contra uma base real; sem testes automáticos, sem despesas recorrentes, sem importação do histórico do Splitwise.
