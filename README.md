@@ -4,7 +4,7 @@ App doméstica para duas pessoas: despesas partilhadas, conta corrente e listas.
 
 ## Funcionalidades (rascunho v0.1)
 
-1. **Despesas** – upload de fatura (PDF/foto) → o Claude lê fornecedor, categoria, valor e data → confirmas e guardas. Resumo mensal com total, variação vs. mês anterior, gastos por categoria e tendência de 6 meses.
+1. **Despesas** – anexas a fatura (PDF/foto, guardada no Supabase Storage) e preenches fornecedor, categoria, valor e data. Resumo mensal com total, variação vs. mês anterior, gastos por categoria e tendência de 6 meses.
 2. **Conta corrente + Splitwise** – cada despesa tem pagador e divisão (por defeito 50/50); o saldo "quem deve quanto a quem" é calculado na app e a despesa pode ser lançada no Splitwise via API.
 3. **Listas** – criar, editar e apagar listas (supermercado, Natal, pendentes…) com itens que se marcam/editam/removem. Colar várias linhas cria vários itens.
 
@@ -12,7 +12,7 @@ App doméstica para duas pessoas: despesas partilhadas, conta corrente e listas.
 
 ```bash
 npm install
-cp .env.example .env.local   # URL + chave publicável do Supabase (+ ANTHROPIC_API_KEY opcional)
+# .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 npm run dev                  # http://localhost:3000
 ```
 
@@ -30,10 +30,14 @@ insert into public.casa_members (email, slot, name) values
 
 Cada pessoa precisa de uma conta em *Authentication → Users* (email + palavra-passe, "Auto Confirm User" ligado). Contas que já existam no projeto servem.
 
-## Deploy (Vercel)
+## Deploy (GitHub Pages)
 
-Variáveis: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`.
+Site 100% estático (`output: 'export'`): tudo corre no browser com `supabase-js`; a segurança dos dados é a RLS. Cada push ao `main` publica via `.github/workflows/pages.yml` em `https://<user>.github.io/<repo>/`.
+
+Uma vez: *Settings → Pages → Build and deployment → Source: **GitHub Actions***.
+
+A chave publicável e o URL do Supabase estão no workflow (são públicos por desenho). Rotas dinâmicas usam query string (`/listas/ver/?id=…`, `/despesas/editar/?id=…`).
 
 ## Estado
 
-Splitwise foi substituído: o saldo é calculado na app a partir das despesas (pagador + divisão) e dos acertos. Ainda não testado contra uma base real; sem testes automáticos, sem despesas recorrentes, sem importação do histórico do Splitwise.
+A leitura automática de faturas (Claude) foi removida ao passar para site estático: precisaria de um servidor para guardar a chave. Splitwise foi substituído: o saldo é calculado na app a partir das despesas (pagador + divisão) e dos acertos. Ainda não testado contra uma base real; sem testes automáticos, sem despesas recorrentes, sem importação do histórico do Splitwise.

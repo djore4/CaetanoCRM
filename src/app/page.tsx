@@ -1,19 +1,46 @@
+"use client";
+
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import { balance, byCategory, monthTotal, trend, whoOwes } from "@/lib/stats";
 import { currentMonth, money, monthLabel, shiftMonth } from "@/lib/format";
 import { CategoryBars, Donut, TrendChart } from "@/components/Charts";
-import { household } from "@/lib/users";
+import { other } from "@/lib/users";
+import { useHousehold } from "@/components/AppShell";
+import { useAsync } from "@/lib/useAsync";
+import type { UserId } from "@/lib/types";
 import { CATEGORIES } from "@/lib/categories";
-import { settleUp } from "./actions";
 
-export const dynamic = "force-dynamic";
+export default function Home() {
+  return (
+    <Suspense>
+      <HomeInner />
+    </Suspense>
+  );
+}
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
-  const { mes } = await searchParams;
-  const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
-  const { users: USERS } = await household();
-  const [expenses, settlements] = await Promise.all([db.expenses(), db.settlements()]);
+function HomeInner() {
+  const mes = useSearchParams().get("mes") ?? "";
+  const month = /^\d{4}-\d{2}$/.test(mes) ? mes : currentMonth();
+  const { users: USERS } = useHousehold();
+  const { data, error, reload } = useAsync(
+    async () => {
+      const [expenses, settlements] = await Promise.all([db.expenses(), db.settlements()]);
+      return { expenses, settlements };
+    },
+    [],
+  );
+  if (error) return <div className="card p-4 text-sm text-red-500">Erro a carregar: {error}</div>;
+  if (!data) return <p className="text-muted">A carregar…</p>;
+  const { expenses, settlements } = data;
+
+  async function settle(from: UserId, amount: number) {
+    if (!(amount > 0)) return;
+    await db.addSettlement({ from, to: other(from), amount }); // "from" = quem deve e entrega o dinheiro
+    reload();
+  }
 
   const total = monthTotal(expenses, month);
   const prev = monthTotal(expenses, shiftMonth(month, -1));
@@ -64,11 +91,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
                 <span className="text-2xl font-bold block">{money(bal.amount)}</span>
                 a <span style={{ color: USERS[bal.creditor].color }}>{USERS[bal.creditor].name}</span>
               </p>
-              <form action={settleUp} className="mt-3">
-                <input type="hidden" name="from" value={bal.debtor} />
-                <input type="hidden" name="amount" value={bal.amount} />
-                <button className="btn btn-ghost w-full !py-2 text-sm">✓ Marcar como saldado</button>
-              </form>
+              <button onClick={() => settle(bal.debtor, bal.amount)} className="btn btn-ghost w-full !py-2 text-sm mt-3">
+                ✓ Marcar como saldado
+              </button>
             </>
           ) : (
             <p className="mt-2 text-lg font-semibold">🎉 Tudo certo, ninguém deve nada.</p>

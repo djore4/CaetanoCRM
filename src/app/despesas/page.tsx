@@ -1,22 +1,32 @@
+"use client";
+
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { db } from "@/lib/db";
 import { CATEGORIES } from "@/lib/categories";
 import { currentMonth, dayLabel, money, monthKey, monthLabel, shiftMonth } from "@/lib/format";
-import { household } from "@/lib/users";
+import { useHousehold } from "@/components/AppShell";
+import { InvoiceLink } from "@/components/InvoiceLink";
+import { useAsync } from "@/lib/useAsync";
 import { ConfirmButton } from "@/components/DeleteButton";
-import { deleteExpense } from "../actions";
 
-export const dynamic = "force-dynamic";
+export default function Despesas() {
+  return (
+    <Suspense>
+      <DespesasInner />
+    </Suspense>
+  );
+}
 
-export default async function Despesas({
-  searchParams,
-}: {
-  searchParams: Promise<{ mes?: string }>;
-}) {
-  const { mes } = await searchParams;
-  const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
-  const { users: USERS } = await household();
-  const rows = (await db.expenses()).filter((e) => monthKey(e.date) === month);
+function DespesasInner() {
+  const mes = useSearchParams().get("mes") ?? "";
+  const month = /^\d{4}-\d{2}$/.test(mes) ? mes : currentMonth();
+  const { users: USERS } = useHousehold();
+  const { data, error, reload } = useAsync(() => db.expenses(), []);
+  if (error) return <div className="card p-4 text-sm text-red-500">Erro a carregar: {error}</div>;
+  if (!data) return <p className="text-muted">A carregar…</p>;
+  const rows = data.filter((e) => monthKey(e.date) === month);
   const total = rows.reduce((s, e) => s + e.amount, 0);
 
   return (
@@ -71,15 +81,16 @@ export default async function Despesas({
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {e.file && (
-                    <a href={`/api/files/${e.file}`} target="_blank" className="text-xs text-accent font-semibold">
-                      Ver fatura
-                    </a>
+                    <InvoiceLink file={e.file} className="text-xs text-accent font-semibold" />
                   )}
-                  <Link href={`/despesas/${e.id}/editar`} className="text-xs text-accent font-semibold">
+                  <Link href={`/despesas/editar/?id=${e.id}`} className="text-xs text-accent font-semibold">
                     Editar
                   </Link>
                   <ConfirmButton
-                    action={deleteExpense.bind(null, e.id)}
+                    action={async () => {
+                      await db.removeExpense(e.id);
+                      reload();
+                    }}
                     message={`Apagar "${e.description}"?`}
                     className="text-xs text-red-500 font-semibold"
                   >
