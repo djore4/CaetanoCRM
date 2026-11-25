@@ -8,6 +8,7 @@ import { greeting } from "@/lib/format";
 import { household, type Household } from "@/lib/users";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { applyTheme, getThemePref } from "@/lib/theme";
+import { registerServiceWorker } from "@/lib/pwa";
 import type { UserId } from "@/lib/types";
 import { Fab, Nav } from "./Nav";
 import { Logo } from "./Icons";
@@ -57,6 +58,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     setHh(h);
     setStatus("in");
   }, []);
+
+  useEffect(() => registerServiceWorker(), []);
 
   // tema: segue o sistema quando a preferência é "automático"
   useEffect(() => {
