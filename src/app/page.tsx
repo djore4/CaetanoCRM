@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { balance, byCategory, monthTotal, trend, whoOwes } from "@/lib/stats";
 import { currentMonth, money, monthLabel, shiftMonth } from "@/lib/format";
 import { CategoryBars, Donut, TrendChart } from "@/components/Charts";
-import { USERS } from "@/lib/users";
+import { household } from "@/lib/users";
 import { CATEGORIES } from "@/lib/categories";
 import { settleUp } from "./actions";
 
@@ -12,14 +12,15 @@ export const dynamic = "force-dynamic";
 export default async function Home({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   const { mes } = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
-  const expenses = db.expenses();
+  const { users: USERS } = await household();
+  const [expenses, settlements] = await Promise.all([db.expenses(), db.settlements()]);
 
   const total = monthTotal(expenses, month);
   const prev = monthTotal(expenses, shiftMonth(month, -1));
   const delta = prev > 0 ? ((total - prev) / prev) * 100 : null;
   const cats = byCategory(expenses, month);
   const top = cats[0];
-  const bal = whoOwes(balance(expenses, db.settlements()));
+  const bal = whoOwes(balance(expenses, settlements));
   const perPerson = total / 2;
   const isCurrent = month === currentMonth();
 
@@ -74,6 +75,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           )}
         </div>
       </div>
+
+      {expenses.length === 0 && (
+        <div className="card p-6 text-center">
+          <p className="text-4xl mb-2">🧾</p>
+          <p className="font-semibold">Ainda não há despesas</p>
+          <p className="text-sm text-muted mb-4">Carrega a primeira fatura e o resumo aparece aqui.</p>
+          <Link href="/despesas/nova" className="btn">＋ Adicionar fatura</Link>
+        </div>
+      )}
 
       {/* insights */}
       {top && (

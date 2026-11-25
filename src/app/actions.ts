@@ -1,23 +1,33 @@
 "use server";
 
-import fs from "node:fs";
 import path from "node:path";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { db, uid, UPLOADS } from "@/lib/db";
+import { db } from "@/lib/db";
 import { extractInvoice } from "@/lib/extract";
-import { pushToSplitwise, splitwiseEnabled } from "@/lib/splitwise";
 import { CATEGORY_KEYS } from "@/lib/categories";
+import { supabaseServer } from "@/lib/supabase/server";
 import { other } from "@/lib/users";
 import type { Category, UserId } from "@/lib/types";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
+const refresh = () => revalidatePath("/", "layout");
 
-/* ---------- utilizador ---------- */
-export async function switchUser(u: UserId) {
-  (await cookies()).set("user", u, { maxAge: 60 * 60 * 24 * 365, path: "/" });
-  revalidatePath("/", "layout");
+/* ---------- sessão ---------- */
+export async function signIn(form: FormData) {
+  const s = await supabaseServer();
+  const { error } = await s.auth.signInWithPassword({
+    email: str(form, "email"),
+    password: str(form, "password"),
+  });
+  if (error) redirect("/login?erro=1");
+  redirect("/");
+}
+
+export async function signOut() {
+  const s = await supabaseServer();
+  await s.auth.signOut();
+  redirect("/login");
 }
 
 /* ---------- despesas ---------- */
@@ -29,32 +39,27 @@ const MIME: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-export async function analyzeInvoice(form: FormData) {
-  const file = form.get("file") as File | null;
-  if (!file || file.size === 0) redirect("/despesas/nova");
-
-  const ext = path.extname(file.name).toLowerCase();
-  const mime = MIME[ext];
+/** O ficheiro já foi carregado pelo browser para o Storage; aqui só o lemos e analisamos. */
+export async function analyzeInvoice(filePath: string) {
+  const safe = path.basename(filePath);
+  const mime = MIME[path.extname(safe).toLowerCase()];
   if (!mime) redirect("/despesas/nova?erro=formato");
 
-  const buf = Buffer.from(await file.arrayBuffer());
-  const stored = `${uid()}${ext}`;
-  fs.mkdirSync(UPLOADS, { recursive: true });
-  fs.writeFileSync(path.join(UPLOADS, stored), buf);
+  const s = await supabaseServer();
+  const { data, error } = await s.storage.from("invoices").download(safe);
+  if (error || !data) redirect("/despesas/nova?erro=ficheiro");
 
-  const q = new URLSearchParams({ file: stored });
+  const q = new URLSearchParams({ file: safe });
   try {
-    const r = await extractInvoice(buf, mime);
+    const r = await extractInvoice(Buffer.from(await data.arrayBuffer()), mime);
     if (r) {
       q.set("description", r.description);
       q.set("category", r.category);
       q.set("amount", String(r.amount));
       q.set("date", r.date);
       q.set("ia", "1");
-    } else if (!process.env.ANTHROPIC_API_KEY) {
-      q.set("erro", "sem-ia");
     } else {
-      q.set("erro", "ilegivel");
+      q.set("erro", process.env.ANTHROPIC_API_KEY ? "ilegivel" : "sem-ia");
     }
   } catch (err) {
     console.error("extractInvoice", err);
@@ -64,45 +69,35 @@ export async function analyzeInvoice(form: FormData) {
 }
 
 export async function saveExpense(form: FormData) {
-  const category = str(form, "category") as Category;
+  const id = str(form, "id");
   const amount = Number(str(form, "amount").replace(",", "."));
-  const splitPct = Number(str(form, "splitPct") || 50);
-  if (!str(form, "description") || !(amount > 0)) redirect("/despesas/nova?erro=campos");
+  const category = str(form, "category") as Category;
+  const back = id ? `/despesas/${id}/editar` : "/despesas/nova";
+  if (!str(form, "description") || !(amount > 0)) redirect(`${back}?erro=campos`);
 
-  const exp = db.addExpense({
+  const data = {
     description: str(form, "description"),
-    category: CATEGORY_KEYS.includes(category) ? category : "outros",
+    category: CATEGORY_KEYS.includes(category) ? category : ("outros" as Category),
     amount,
     date: str(form, "date") || new Date().toISOString().slice(0, 10),
-    paidBy: (str(form, "paidBy") as UserId) === "b" ? "b" : "a",
-    splitPct: Math.min(100, Math.max(0, splitPct)),
-    file: str(form, "file") || undefined,
-    source: str(form, "ia") ? "ia" : "manual",
-  });
+    paidBy: (str(form, "paidBy") === "b" ? "b" : "a") as UserId,
+    splitPct: Math.min(100, Math.max(0, Number(str(form, "splitPct") || 50))),
+  };
 
-  if (str(form, "splitwise") && splitwiseEnabled()) {
-    try {
-      db.updateExpense(exp.id, { splitwiseId: await pushToSplitwise(exp) });
-    } catch (err) {
-      console.error(err);
-      revalidatePath("/", "layout");
-      redirect("/despesas?aviso=splitwise");
-    }
-  }
-  revalidatePath("/", "layout");
+  if (id) await db.updateExpense(id, data);
+  else
+    await db.addExpense({
+      ...data,
+      file: str(form, "file") || undefined,
+      source: str(form, "ia") ? "ia" : "manual",
+    });
+  refresh();
   redirect("/despesas");
 }
 
 export async function deleteExpense(id: string) {
-  db.removeExpense(id);
-  revalidatePath("/", "layout");
-}
-
-export async function retrySplitwise(id: string) {
-  const e = db.expenses().find((x) => x.id === id);
-  if (!e || e.splitwiseId || !splitwiseEnabled()) return;
-  db.updateExpense(id, { splitwiseId: await pushToSplitwise(e) });
-  revalidatePath("/", "layout");
+  await db.removeExpense(id);
+  refresh();
 }
 
 export async function settleUp(form: FormData) {
@@ -110,53 +105,48 @@ export async function settleUp(form: FormData) {
   if (!(amount > 0)) return;
   // "from" = quem tem a dívida e entrega o dinheiro ao outro
   const from: UserId = str(form, "from") === "b" ? "b" : "a";
-  db.addSettlement({
-    from,
-    to: other(from),
-    amount,
-    date: new Date().toISOString().slice(0, 10),
-  });
-  revalidatePath("/", "layout");
+  await db.addSettlement({ from, to: other(from), amount });
+  refresh();
 }
 
 /* ---------- listas ---------- */
 export async function createList(form: FormData) {
   const name = str(form, "name");
   if (!name) return;
-  const l = db.addList(name, str(form, "emoji") || "📝");
+  const id = await db.addList(name, str(form, "emoji") || "📝");
   revalidatePath("/listas");
-  redirect(`/listas/${l.id}`);
+  redirect(`/listas/${id}`);
 }
 export async function renameList(id: string, form: FormData) {
   const name = str(form, "name");
-  if (name) db.updateList(id, { name, emoji: str(form, "emoji") || "📝" });
+  if (name) await db.updateList(id, { name, emoji: str(form, "emoji") || "📝" });
   revalidatePath("/listas", "layout");
 }
 export async function deleteList(id: string) {
-  db.removeList(id);
+  await db.removeList(id);
   revalidatePath("/listas", "layout");
   redirect("/listas");
 }
 export async function addItem(listId: string, form: FormData) {
-  const raw = str(form, "text");
   // permite colar várias linhas de uma vez
-  for (const line of raw.split("\n").map((s) => s.trim()).filter(Boolean)) db.addItem(listId, line);
+  const lines = str(form, "text").split("\n").map((s) => s.trim()).filter(Boolean);
+  if (lines.length) await db.addItems(listId, lines);
   revalidatePath("/listas", "layout");
 }
-export async function toggleItem(listId: string, itemId: string, done: boolean) {
-  db.updateItem(listId, itemId, { done });
+export async function toggleItem(itemId: string, done: boolean) {
+  await db.updateItem(itemId, { done });
   revalidatePath("/listas", "layout");
 }
-export async function editItem(listId: string, itemId: string, form: FormData) {
+export async function editItem(itemId: string, form: FormData) {
   const text = str(form, "text");
-  if (text) db.updateItem(listId, itemId, { text });
+  if (text) await db.updateItem(itemId, { text });
   revalidatePath("/listas", "layout");
 }
-export async function deleteItem(listId: string, itemId: string) {
-  db.removeItem(listId, itemId);
+export async function deleteItem(itemId: string) {
+  await db.removeItem(itemId);
   revalidatePath("/listas", "layout");
 }
 export async function clearDone(listId: string) {
-  db.clearDone(listId);
+  await db.clearDone(listId);
   revalidatePath("/listas", "layout");
 }

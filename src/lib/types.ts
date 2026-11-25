@@ -23,7 +23,6 @@ export interface Expense {
   splitPct: number; // % suportada pelo pagador (50 = a meias)
   file?: string; // nome do ficheiro em data/uploads
   source: "manual" | "ia";
-  splitwiseId?: string;
   createdAt: string;
 }
 

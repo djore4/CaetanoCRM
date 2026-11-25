@@ -12,15 +12,21 @@ App doméstica para duas pessoas: despesas partilhadas, conta corrente e listas.
 
 ```bash
 npm install
-cp .env.example .env.local   # opcional: chaves Anthropic / Splitwise
+cp .env.example .env.local   # URL + chave publicável do Supabase (+ ANTHROPIC_API_KEY opcional)
 npm run dev                  # http://localhost:3000
 ```
 
-Sem chaves, a app funciona com preenchimento manual. `DEMO_DATA=false` arranca sem dados de exemplo; `npm run reset-db` apaga os dados locais.
+## Base de dados (Supabase)
 
-## Estado do rascunho (o que ainda NÃO está feito)
+1. Cria um projeto Supabase **dedicado** e aplica `supabase/migrations/*.sql`.
+2. Em *Authentication → Sign In / Providers* cria os 2 utilizadores (email + palavra-passe) e **desativa o registo público**.
+3. Os 2 primeiros utilizadores criados ficam com os lugares A e B (trigger em `auth.users`); RLS impede qualquer outro de ler ou escrever.
+4. As faturas ficam no bucket privado `invoices`; o browser carrega-as diretamente (limite de 4,5 MB do Vercel não se aplica).
 
-- **Sem login**: o seletor João/Parceira no topo só escolhe quem está a "ver". Não é segurança.
-- **Persistência em ficheiro JSON** (`data/db.json`), isolada em `src/lib/db.ts`. Não serve para deploy em Vercel; o passo seguinte é Supabase (Postgres + Auth + Storage).
-- **Splitwise não testado** contra uma conta real; só cria despesas (não lê nem sincroniza o saldo de volta).
-- Sem editar despesas já guardadas (só apagar), sem despesas recorrentes, sem testes automáticos.
+## Deploy (Vercel)
+
+Variáveis: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ANTHROPIC_API_KEY`.
+
+## Estado
+
+Splitwise foi substituído: o saldo é calculado na app a partir das despesas (pagador + divisão) e dos acertos. Ainda não testado contra uma base real; sem testes automáticos, sem despesas recorrentes, sem importação do histórico do Splitwise.

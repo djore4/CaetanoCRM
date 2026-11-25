@@ -2,26 +2,22 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { CATEGORIES } from "@/lib/categories";
 import { currentMonth, dayLabel, money, monthKey, monthLabel, shiftMonth } from "@/lib/format";
-import { USERS } from "@/lib/users";
-import { splitwiseEnabled } from "@/lib/splitwise";
+import { household } from "@/lib/users";
 import { ConfirmButton } from "@/components/DeleteButton";
-import { deleteExpense, retrySplitwise } from "../actions";
+import { deleteExpense } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function Despesas({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; aviso?: string }>;
+  searchParams: Promise<{ mes?: string }>;
 }) {
-  const { mes, aviso } = await searchParams;
+  const { mes } = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
-  const rows = db
-    .expenses()
-    .filter((e) => monthKey(e.date) === month)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const { users: USERS } = await household();
+  const rows = (await db.expenses()).filter((e) => monthKey(e.date) === month);
   const total = rows.reduce((s, e) => s + e.amount, 0);
-  const sw = splitwiseEnabled();
 
   return (
     <div className="space-y-5">
@@ -39,12 +35,6 @@ export default async function Despesas({
         <Link href={`/despesas?mes=${shiftMonth(month, -1)}`} className="btn btn-ghost !px-3">←</Link>
         <Link href={`/despesas?mes=${shiftMonth(month, 1)}`} className="btn btn-ghost !px-3">→</Link>
       </div>
-
-      {aviso === "splitwise" && (
-        <div className="card p-4 text-sm border-amber-400">
-          ⚠️ A despesa foi guardada, mas não foi possível enviá-la para o Splitwise. Podes tentar de novo abaixo.
-        </div>
-      )}
 
       {rows.length === 0 ? (
         <div className="card p-10 text-center text-muted">
@@ -85,12 +75,9 @@ export default async function Despesas({
                       Ver fatura
                     </a>
                   )}
-                  {sw && !e.splitwiseId && (
-                    <form action={retrySplitwise.bind(null, e.id)}>
-                      <button className="text-xs text-accent font-semibold">→ Splitwise</button>
-                    </form>
-                  )}
-                  {e.splitwiseId && <span className="text-[11px] text-muted">✓ Splitwise</span>}
+                  <Link href={`/despesas/${e.id}/editar`} className="text-xs text-accent font-semibold">
+                    Editar
+                  </Link>
                   <ConfirmButton
                     action={deleteExpense.bind(null, e.id)}
                     message={`Apagar "${e.description}"?`}
