@@ -2,49 +2,88 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon, Logo, type IconName } from "./Icons";
 
-const ITEMS = [
-  { href: "/", label: "Resumo", icon: "📊" },
-  { href: "/despesas", label: "Despesas", icon: "🧾" },
-  { href: "/listas", label: "Listas", icon: "✅" },
+const ITEMS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/", label: "Resumo", icon: "chart" },
+  { href: "/despesas/", label: "Despesas", icon: "receipt" },
+  { href: "/listas/", label: "Listas", icon: "list" },
 ];
 
 export function Nav() {
-  const path = usePathname();
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const raw = usePathname() || "/";
+  const path = raw.replace(/\/$/, "") || "/";
+  const active = (href: string) => {
+    const h = href.replace(/\/$/, "") || "/";
+    return h === "/" ? path === "/" : path.startsWith(h);
+  };
   return (
     <>
       {/* desktop: barra lateral */}
-      <nav className="hidden md:flex fixed inset-y-0 left-0 w-56 flex-col gap-1 p-4 border-r border-line bg-card">
-        <div className="px-3 py-4 text-xl font-bold">🏡 Casa</div>
-        {ITEMS.map((i) => (
-          <Link
-            key={i.href}
-            href={i.href}
-            className={`px-3 py-2.5 rounded-xl font-medium ${
-              active(i.href) ? "bg-accent text-white" : "text-muted hover:bg-bg"
-            }`}
-          >
-            <span className="mr-2">{i.icon}</span>
-            {i.label}
-          </Link>
-        ))}
+      <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-card/70 p-5 backdrop-blur-xl md:flex">
+        <Link href="/" className="mb-8 flex items-center gap-3 px-2">
+          <Logo />
+          <span className="text-xl font-bold tracking-tight">Casa</span>
+        </Link>
+        <div className="space-y-1">
+          {ITEMS.map((i) => {
+            const on = active(i.href);
+            return (
+              <Link
+                key={i.href}
+                href={i.href}
+                className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 font-semibold transition ${
+                  on ? "bg-accent-soft text-accent" : "text-muted hover:bg-soft hover:text-ink"
+                }`}
+              >
+                <Icon name={i.icon} strokeWidth={on ? 2.2 : 1.8} />
+                {i.label}
+              </Link>
+            );
+          })}
+        </div>
+        <Link href="/despesas/nova/" className="btn mt-6">
+          <Icon name="plus" className="h-4 w-4" strokeWidth={2.6} /> Nova despesa
+        </Link>
+        <p className="mt-auto px-2 text-xs text-muted">Despesas e listas partilhadas</p>
       </nav>
+
       {/* telemóvel: barra em baixo */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 grid grid-cols-3 border-t border-line bg-card pb-[env(safe-area-inset-bottom)]">
-        {ITEMS.map((i) => (
-          <Link
-            key={i.href}
-            href={i.href}
-            className={`flex flex-col items-center py-2.5 text-xs font-semibold ${
-              active(i.href) ? "text-accent" : "text-muted"
-            }`}
-          >
-            <span className="text-xl leading-none mb-0.5">{i.icon}</span>
-            {i.label}
-          </Link>
-        ))}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-card/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-3">
+          {ITEMS.map((i) => {
+            const on = active(i.href);
+            return (
+              <Link
+                key={i.href}
+                href={i.href}
+                className={`relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition ${
+                  on ? "text-accent" : "text-muted"
+                }`}
+              >
+                <span className={`grid h-8 w-14 place-items-center rounded-full transition ${on ? "bg-accent-soft" : ""}`}>
+                  <Icon name={i.icon} className="h-[1.3rem] w-[1.3rem]" strokeWidth={on ? 2.2 : 1.8} />
+                </span>
+                {i.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </>
+  );
+}
+
+/** Botão flutuante para registar uma despesa (só no telemóvel). */
+export function Fab() {
+  return (
+    <Link
+      href="/despesas/nova/"
+      aria-label="Nova despesa"
+      className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-5 z-30 grid h-14 w-14 place-items-center rounded-2xl text-white shadow-[0_14px_30px_-10px_var(--accent)] transition active:scale-95 md:hidden"
+      style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))" }}
+    >
+      <Icon name="plus" className="h-6 w-6" strokeWidth={2.6} />
+    </Link>
   );
 }

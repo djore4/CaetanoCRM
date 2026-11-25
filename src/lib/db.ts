@@ -32,13 +32,18 @@ const toSettlement = (r: any): Settlement => ({
 
 export const db = {
   /* ----- perfis ----- */
-  async me(): Promise<{ slot: UserId; name: string } | null> {
+  async me(): Promise<{ slot: UserId; name: string; email: string } | null> {
     const s = supabaseBrowser();
     const { data: sess } = await s.auth.getSession();
     const email = sess.session?.user.email?.toLowerCase();
     if (!email) return null;
     const { data } = await s.from("casa_members").select("slot,name").eq("email", email).maybeSingle();
-    return data ? { slot: data.slot as UserId, name: data.name } : null;
+    return data ? { slot: data.slot as UserId, name: data.name, email } : null;
+  },
+  /** Só altera a linha do próprio utilizador (função casa_set_my_name). */
+  async setMyName(name: string) {
+    const s = supabaseBrowser();
+    check(await s.rpc("casa_set_my_name", { p_name: name }), "setMyName");
   },
   async profiles(): Promise<{ slot: UserId; name: string }[]> {
     const s = supabaseBrowser();

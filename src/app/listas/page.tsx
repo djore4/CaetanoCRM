@@ -1,78 +1,127 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import { useAsync } from "@/lib/useAsync";
+import { Icon } from "@/components/Icons";
+import { ProgressRing } from "@/components/ProgressRing";
+import { ErrorCard, Skeleton } from "@/components/Skeleton";
 
-const EMOJIS = ["🛒", "🎄", "📌", "🎁", "🧹", "✈️", "🍽️", "🔧", "📝"];
+const EMOJIS = ["🛒", "🎄", "📌", "🎁", "🧹", "✈️", "🍽️", "🔧", "💊", "📚", "🐾", "📝"];
+const TEMPLATES: [string, string][] = [
+  ["🛒", "Supermercado"],
+  ["🎄", "Compras de Natal"],
+  ["📌", "Pendentes"],
+  ["🧹", "Limpezas"],
+];
 
 export default function Listas() {
   const router = useRouter();
   const { data: lists, error } = useAsync(() => db.lists(), []);
-  async function create(name: string, emoji: string) {
-    if (!name.trim()) return;
-    const id = await db.addList(name.trim(), emoji || "📝");
+  const [emoji, setEmoji] = useState("📝");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function create(n: string, e: string) {
+    if (!n.trim() || busy) return;
+    setBusy(true);
+    const id = await db.addList(n.trim(), e || "📝");
     router.push(`/listas/ver/?id=${id}`);
   }
-  if (error) return <div className="card p-4 text-sm text-red-500">Erro a carregar: {error}</div>;
-  if (!lists) return <p className="text-muted">A carregar…</p>;
+
+  if (error) return <ErrorCard message={error} />;
+
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold">Listas</h1>
+      <div>
+        <p className="text-sm font-medium text-muted">Listas</p>
+        <h1 className="text-3xl font-bold tracking-tight">O que há para fazer</h1>
+      </div>
 
-      {lists.length === 0 && (
-        <div className="card p-6 text-center space-y-4">
-          <p className="text-4xl">✅</p>
-          <p className="text-muted text-sm">Ainda não há listas. Começa por uma destas:</p>
+      {!lists ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+      ) : lists.length === 0 ? (
+        <div className="card p-7 text-center">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-2xl">✅</div>
+          <p className="font-bold">Ainda não há listas</p>
+          <p className="mb-5 text-sm text-muted">Começa por uma destas, ou cria a tua em baixo.</p>
           <div className="flex flex-wrap justify-center gap-2">
-            {[
-              ["🛒", "Supermercado"],
-              ["🎄", "Compras de Natal"],
-              ["📌", "Pendentes"],
-            ].map(([emoji, name]) => (
-              <button key={name} onClick={() => create(name, emoji)} className="btn btn-ghost">
-                {emoji} {name}
+            {TEMPLATES.map(([e, n]) => (
+              <button key={n} onClick={() => create(n, e)} className="btn btn-ghost !py-2 text-sm">
+                {e} {n}
               </button>
             ))}
           </div>
         </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {lists.map((l) => {
+            const open = l.items.filter((i) => !i.done).length;
+            const pct = l.items.length ? ((l.items.length - open) / l.items.length) * 100 : 0;
+            return (
+              <Link
+                key={l.id}
+                href={`/listas/ver/?id=${l.id}`}
+                className="card group flex items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:border-accent/40"
+              >
+                <div className="relative grid place-items-center">
+                  <ProgressRing pct={pct} size={52} />
+                  <span className="absolute text-xl">{l.emoji}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{l.name}</p>
+                  <p className="text-sm text-muted">
+                    {l.items.length === 0 ? "Vazia" : open === 0 ? "Tudo feito ✓" : `${open} por fazer`}
+                  </p>
+                </div>
+                <Icon name="chevronRight" className="h-5 w-5 text-muted transition group-hover:translate-x-0.5" />
+              </Link>
+            );
+          })}
+        </div>
       )}
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {lists.map((l) => {
-          const open = l.items.filter((i) => !i.done).length;
-          const pct = l.items.length ? ((l.items.length - open) / l.items.length) * 100 : 0;
-          return (
-            <Link key={l.id} href={`/listas/ver/?id=${l.id}`} className="card p-5 hover:border-accent transition">
-              <div className="text-3xl">{l.emoji}</div>
-              <p className="font-bold mt-2 truncate">{l.name}</p>
-              <p className="text-sm text-muted">
-                {l.items.length === 0 ? "Vazia" : open === 0 ? "Tudo feito ✓" : `${open} por fazer`}
-              </p>
-              <div className="h-1.5 rounded-full bg-bg mt-3 overflow-hidden">
-                <div className="h-full bg-accent rounded-full" style={{ width: `${pct}%` }} />
-              </div>
-            </Link>
-          );
-        })}
-      </div>
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          create(String(f.get("name") ?? ""), String(f.get("emoji") ?? ""));
+          create(name, emoji);
         }}
-        className="card p-4 flex gap-2 items-center"
+        className="card p-4"
       >
-        <select name="emoji" className="input !w-20 text-xl" aria-label="Ícone">
+        <p className="label px-1">Nova lista</p>
+        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
           {EMOJIS.map((e) => (
-            <option key={e}>{e}</option>
+            <button
+              key={e}
+              type="button"
+              aria-pressed={emoji === e}
+              onClick={() => setEmoji(e)}
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg transition ${
+                emoji === e ? "bg-accent-soft ring-2 ring-accent" : "bg-soft hover:scale-105"
+              }`}
+            >
+              {e}
+            </button>
           ))}
-        </select>
-        <input name="name" className="input" placeholder="Nova lista (ex.: Férias)" required />
-        <button className="btn shrink-0">Criar</button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input"
+            placeholder="Ex.: Férias, Obras…"
+            aria-label="Nome da lista"
+          />
+          <button className="btn shrink-0" disabled={!name.trim() || busy}>
+            Criar
+          </button>
+        </div>
       </form>
     </div>
   );

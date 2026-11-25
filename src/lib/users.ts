@@ -1,7 +1,7 @@
 import { db } from "./db";
 import type { UserId } from "./types";
 
-const COLORS: Record<UserId, string> = { a: "#4f6bed", b: "#e0567f" };
+export const USER_COLORS: Record<UserId, string> = { a: "#5b6cf0", b: "#e2508a" };
 
 export const other = (u: UserId): UserId => (u === "a" ? "b" : "a");
 
@@ -18,8 +18,8 @@ export async function household(): Promise<Household> {
   return {
     me: me?.slot ?? "a",
     users: {
-      a: { name: name("a", "Pessoa A"), color: COLORS.a },
-      b: { name: name("b", "Pessoa B"), color: COLORS.b },
+      a: { name: name("a", "Pessoa A"), color: USER_COLORS.a },
+      b: { name: name("b", "Pessoa B"), color: USER_COLORS.b },
     },
   };
 }
