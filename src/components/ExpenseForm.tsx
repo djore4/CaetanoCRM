@@ -1,11 +1,14 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { CATEGORIES, CATEGORY_KEYS } from "@/lib/categories";
-import type { UserId } from "@/lib/types";
-import { saveExpense } from "@/app/actions";
+import { db } from "@/lib/db";
+import type { Category, UserId } from "@/lib/types";
 
 export interface ExpenseDefaults {
   id?: string;
   file?: string;
-  ia?: string;
   description?: string;
   amount?: string;
   date?: string;
@@ -23,13 +26,44 @@ export function ExpenseForm({
   users: Record<UserId, { name: string }>;
   submitLabel: string;
 }) {
+  const router = useRouter();
+  const [erro, setErro] = useState("");
+  const [busy, setBusy] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const split = d.splitPct ?? 50;
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const str = (k: string) => String(f.get(k) ?? "").trim();
+    const amount = Number(str("amount").replace(",", "."));
+    const category = str("category") as Category;
+    if (!str("description") || !(amount > 0)) return setErro("Faltam a descrição ou um valor válido.");
+
+    const data = {
+      description: str("description"),
+      category: CATEGORY_KEYS.includes(category) ? category : ("outros" as Category),
+      amount,
+      date: str("date") || today,
+      paidBy: (str("paidBy") === "b" ? "b" : "a") as UserId,
+      splitPct: Math.min(100, Math.max(0, Number(str("splitPct") || 50))),
+    };
+    setBusy(true);
+    setErro("");
+    try {
+      if (d.id) await db.updateExpense(d.id, data);
+      else await db.addExpense({ ...data, file: d.file, source: "manual" });
+      router.push("/despesas/");
+    } catch (err) {
+      console.error(err);
+      setErro("Não foi possível guardar. Tenta de novo.");
+      setBusy(false);
+    }
+  }
+
   return (
-    <form action={saveExpense} className="card p-5 space-y-4">
-      <input type="hidden" name="id" value={d.id ?? ""} />
-      <input type="hidden" name="file" value={d.file ?? ""} />
-      <input type="hidden" name="ia" value={d.ia ?? ""} />
+    <form onSubmit={onSubmit} className="card p-5 space-y-4">
+      {erro && <p className="text-sm text-red-500">{erro}</p>}
       <div>
         <label className="label" htmlFor="description">Fornecedor / descrição</label>
         <input id="description" name="description" className="input" defaultValue={d.description} placeholder="Ex.: EDP" required />
@@ -74,7 +108,7 @@ export function ExpenseForm({
           </select>
         </div>
       </div>
-      <button className="btn w-full">{submitLabel}</button>
+      <button className="btn w-full" disabled={busy}>{busy ? "A guardar…" : submitLabel}</button>
     </form>
   );
 }

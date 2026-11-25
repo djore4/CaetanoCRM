@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { analyzeInvoice } from "@/app/actions";
+import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 const MAX_PDF = 20 * 1024 * 1024;
@@ -19,9 +19,10 @@ async function shrinkImage(file: File): Promise<Blob> {
   );
 }
 
-export function InvoiceUploader({ aiEnabled }: { aiEnabled: boolean }) {
+export function InvoiceUploader() {
+  const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<"idle" | "uploading" | "reading">("idle");
+  const [state, setState] = useState<"idle" | "uploading">("idle");
   const [error, setError] = useState("");
 
   async function onFile(file: File) {
@@ -38,11 +39,8 @@ export function InvoiceUploader({ aiEnabled }: { aiEnabled: boolean }) {
         .storage.from("casa-invoices")
         .upload(name, body, { contentType: isPdf ? "application/pdf" : "image/jpeg" });
       if (upErr) throw upErr;
-      setState("reading");
-      await analyzeInvoice(name); // redireciona para o formulário pré-preenchido
+      router.push(`/despesas/nova/?file=${encodeURIComponent(name)}`);
     } catch (e) {
-      // o redirect do Next lança uma exceção interna: deixamo-la passar
-      if (e && typeof e === "object" && "digest" in e) throw e;
       console.error(e);
       setState("idle");
       setError("Não foi possível carregar o ficheiro. Tenta de novo.");
@@ -60,10 +58,10 @@ export function InvoiceUploader({ aiEnabled }: { aiEnabled: boolean }) {
       >
         <span className="text-4xl block mb-2">{busy ? "⏳" : "📄"}</span>
         <span className="font-semibold block">
-          {state === "uploading" ? "A carregar…" : state === "reading" ? "A ler a fatura…" : "Carregar fatura"}
+          {busy ? "A carregar…" : "Anexar fatura"}
         </span>
         <span className="block text-sm text-muted mt-1">
-          PDF ou foto · {aiEnabled ? "leitura automática ativa ✨" : "sem leitura automática (preenchimento manual)"}
+          PDF ou foto · fica guardada com a despesa
         </span>
       </button>
       <input
@@ -74,7 +72,7 @@ export function InvoiceUploader({ aiEnabled }: { aiEnabled: boolean }) {
         onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
-      <p className="text-center text-xs text-muted">ou preenche à mão em baixo</p>
+      <p className="text-center text-xs text-muted">ou regista a despesa sem anexo, em baixo</p>
     </div>
   );
 }

@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { deleteItem, editItem, toggleItem } from "@/app/actions";
+import { useState } from "react";
+import { db } from "@/lib/db";
 import type { ListItem } from "@/lib/types";
 
-export function ItemRow({ item }: { item: ListItem }) {
+export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => void }) {
   const [editing, setEditing] = useState(false);
   const [done, setDone] = useState(item.done); // resposta imediata ao toque
-  const [, start] = useTransition();
 
   if (editing) {
     return (
       <form
-        action={async (f) => {
-          await editItem(item.id, f);
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const text = String(new FormData(e.currentTarget).get("text") ?? "").trim();
+          if (text) await db.updateItem(item.id, { text });
           setEditing(false);
+          onChange();
         }}
         className="flex gap-2 p-3"
       >
@@ -28,9 +30,10 @@ export function ItemRow({ item }: { item: ListItem }) {
     <li className="flex items-center gap-3 px-4 py-3">
       <button
         aria-label={done ? "Desmarcar" : "Marcar como feito"}
-        onClick={() => {
+        onClick={async () => {
           setDone(!done);
-          start(() => toggleItem(item.id, !done));
+          await db.updateItem(item.id, { done: !done });
+          onChange();
         }}
         className={`w-6 h-6 rounded-full border-2 grid place-items-center shrink-0 transition ${
           done ? "bg-accent border-accent text-white" : "border-line"
@@ -41,7 +44,10 @@ export function ItemRow({ item }: { item: ListItem }) {
       <span className={`flex-1 ${done ? "line-through text-muted" : ""}`}>{item.text}</span>
       <button onClick={() => setEditing(true)} className="text-muted text-sm px-1" aria-label="Editar">✎</button>
       <button
-        onClick={() => start(() => deleteItem(item.id))}
+        onClick={async () => {
+          await db.removeItem(item.id);
+          onChange();
+        }}
         className="text-muted text-sm px-1 hover:text-red-500"
         aria-label="Remover"
       >
