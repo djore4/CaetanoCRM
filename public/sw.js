@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar a app e abrir o "esqueleto" sem rede.
 // Os dados (Supabase) nunca passam por cache: são sempre pedidos à rede.
-const CACHE = "casa-v1";
+const CACHE = "homi-v2";
 const SCOPE = new URL(self.registration.scope).pathname; // ex.: /Homi/
 
 self.addEventListener("install", (e) => {

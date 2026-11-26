@@ -7,19 +7,20 @@ const BP = process.env.NEXT_PUBLIC_BASE_PATH || "";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: `${BP}/`,
-    name: "Casa · despesas e listas",
-    short_name: "Casa",
-    description: "Despesas, conta corrente e listas partilhadas.",
+    name: "Homi",
+    short_name: "Homi",
+    description: "Despesas, conta corrente e listas da casa, a dois.",
     lang: "pt-PT",
     start_url: `${BP}/`,
     scope: `${BP}/`,
     display: "standalone",
     orientation: "portrait",
     background_color: "#f4f5f9",
-    theme_color: "#5b6cf0",
+    theme_color: "#6a5cf5",
     icons: [
       { src: `${BP}/icons/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: `${BP}/icons/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: `${BP}/icon.svg`, sizes: "any", type: "image/svg+xml", purpose: "any" },
       { src: `${BP}/icons/maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [

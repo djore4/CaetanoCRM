@@ -23,7 +23,7 @@ export function Nav() {
       <nav className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-card/70 p-5 backdrop-blur-xl md:flex">
         <Link href="/" className="mb-8 flex items-center gap-3 px-2">
           <Logo />
-          <span className="text-xl font-bold tracking-tight">Casa</span>
+          <span className="text-xl font-bold tracking-tight">Homi</span>
         </Link>
         <div className="space-y-1">
           {ITEMS.map((i) => {

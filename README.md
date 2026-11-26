@@ -1,4 +1,4 @@
-# Casa (nome provisório)
+# Homi
 
 App doméstica para duas pessoas: despesas partilhadas, conta corrente e listas.
 

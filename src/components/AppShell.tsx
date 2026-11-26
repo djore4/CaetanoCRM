@@ -119,7 +119,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 md:px-8">
             <Link href="/" className="flex items-center gap-2.5 md:hidden">
               <Logo className="h-8 w-8" />
-              <span className="text-lg font-bold tracking-tight">Casa</span>
+              <span className="text-lg font-bold tracking-tight">Homi</span>
             </Link>
             <p className="hidden text-sm text-muted md:block">
               {greeting()}, <b className="font-semibold text-ink">{hh.users[me.slot].name}</b>

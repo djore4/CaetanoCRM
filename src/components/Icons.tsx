@@ -163,13 +163,29 @@ export function Icon({
   );
 }
 
+/** Marca Homi: um "h" debaixo de um telhado. */
+export function LogoMark({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth={9.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 47 50 24l28 23" />
+      <path d="M35 38v40" />
+      <path d="M35 63c0-8 6-13.5 13-13.5S61 55 61 63v15" />
+    </svg>
+  );
+}
+
 export function Logo({ className = "w-9 h-9" }: { className?: string }) {
   return (
     <span
-      className={`${className} rounded-xl grid place-items-center text-white shadow-[0_8px_20px_-8px_var(--accent)]`}
-      style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))" }}
+      className={`${className} relative grid place-items-center overflow-hidden rounded-[28%] text-white shadow-[0_8px_20px_-8px_var(--accent)]`}
+      style={{ background: "linear-gradient(135deg, #6a5cf5, #b05cf0)" }}
+      aria-label="Homi"
     >
-      <Icon name="home" className="w-[55%] h-[55%]" strokeWidth={2.2} />
+      <span
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "radial-gradient(circle at 30% 20%, rgb(255 255 255 / 0.28), transparent 60%)" }}
+      />
+      <LogoMark className="relative h-[78%] w-[78%]" />
     </span>
   );
 }

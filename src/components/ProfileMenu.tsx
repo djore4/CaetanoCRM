@@ -352,7 +352,7 @@ function InstallHelp({ ios, onDone }: { ios: boolean; onDone: () => void }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/icons/icon-192.png`} alt="" className="h-14 w-14 rounded-2xl" />
         <div>
-          <p className="font-bold">Casa</p>
+          <p className="font-bold">Homi</p>
           <p className="text-sm text-muted">Abre em ecrã inteiro, como uma app, a partir do ecrã principal.</p>
         </div>
       </div>
@@ -380,7 +380,7 @@ function InstallHelp({ ios, onDone }: { ios: boolean; onDone: () => void }) {
             Escolhe <b>Instalar app</b> ou <b>Adicionar ao ecrã principal</b>.
           </Step>
           <Step n={3}>
-            Confirma. A app <b>Casa</b> aparece junto das outras.
+            Confirma. A app <b>Homi</b> aparece junto das outras.
           </Step>
         </ol>
       )}
