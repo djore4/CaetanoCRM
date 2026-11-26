@@ -8,7 +8,7 @@ import { BackButton } from "@/components/BackButton";
 import { ConfirmButton } from "@/components/DeleteButton";
 import { Icon } from "@/components/Icons";
 import { ItemRow } from "@/components/ItemRow";
-import { RecurrenceFields } from "@/components/RecurrenceFields";
+import { RecurrenceField } from "@/components/RecurrenceField";
 import type { Recurrence } from "@/lib/types";
 import { Modal } from "@/components/Modal";
 import { ErrorCard, ListSkeleton, Skeleton } from "@/components/Skeleton";
@@ -30,7 +30,6 @@ function ListaInner() {
   const [settings, setSettings] = useState(false);
   const [text, setText] = useState("");
   const [recur, setRecur] = useState<Recurrence | null>(null);
-  const [showRecur, setShowRecur] = useState(false);
 
   if (error) return <ErrorCard message={error} />;
   if (loading)
@@ -89,7 +88,6 @@ function ListaInner() {
           setText("");
           await db.addItems(list.id, lines, recur);
           setRecur(null);
-          setShowRecur(false);
           reload();
         }}
         className="card p-2 pl-4"
@@ -104,24 +102,13 @@ function ListaInner() {
           autoComplete="off"
           aria-label="Novo item"
         />
-        <button
-          type="button"
-          onClick={() => setShowRecur((v) => !v)}
-          className={`icon-btn !h-9 !w-9 ${recur ? "text-accent" : "text-muted"}`}
-          aria-label="Repetir"
-          aria-pressed={showRecur}
-        >
-          <span aria-hidden>🔁</span>
-        </button>
         <button className="btn !px-4 !py-2" disabled={!text.trim()}>
           Adicionar
         </button>
         </div>
-        {showRecur && (
-          <div className="mt-2 pb-1 pr-2">
-            <RecurrenceFields value={recur} onChange={setRecur} />
-          </div>
-        )}
+        <div className="mt-1 pb-1">
+          <RecurrenceField value={recur} onChange={setRecur} />
+        </div>
       </form>
 
       {list.items.length === 0 ? (

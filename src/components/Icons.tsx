@@ -16,6 +16,15 @@ const PATHS = {
       <path d="m3.5 6 1.3 1.3L7.3 4.8M3.5 12l1.3 1.3 2.5-2.5M3.5 18l1.3 1.3 2.5-2.5" />
     </>
   ),
+  repeat: (
+    <>
+      <path d="m17 2.5 3.5 3.5-3.5 3.5" />
+      <path d="M3.5 11V10A4 4 0 0 1 7.5 6h13" />
+      <path d="m7 21.5-3.5-3.5L7 14.5" />
+      <path d="M20.5 13v1a4 4 0 0 1-4 4h-13" />
+    </>
+  ),
+  minus: <path d="M5 12h14" />,
   plus: <path d="M12 5v14M5 12h14" />,
   chevronLeft: <path d="m15 18-6-6 6-6" />,
   chevronRight: <path d="m9 18 6-6-6-6" />,

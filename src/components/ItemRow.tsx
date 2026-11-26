@@ -4,7 +4,7 @@ import { useState } from "react";
 import { db, recurLabel } from "@/lib/db";
 import type { ListItem, Recurrence } from "@/lib/types";
 import { Icon } from "./Icons";
-import { RecurrenceFields } from "./RecurrenceFields";
+import { RecurrenceField } from "./RecurrenceField";
 
 export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => void }) {
   const [editing, setEditing] = useState(false);
@@ -31,7 +31,7 @@ export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => vo
           className="space-y-2"
         >
           <input name="text" defaultValue={item.text} autoFocus className="input !py-2" />
-          <RecurrenceFields value={recur} onChange={setRecur} />
+          <RecurrenceField value={recur} onChange={setRecur} />
           <div className="flex gap-2">
             <button type="button" className="btn btn-ghost flex-1 !py-2" onClick={() => { setRecur(item.recur ?? null); setEditing(false); }}>
               Cancelar
@@ -59,20 +59,22 @@ export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => vo
       >
         {done && <Icon name="check" className="h-3.5 w-3.5" strokeWidth={3} />}
       </button>
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        className={`min-w-0 flex-1 text-left transition ${done ? "text-muted line-through decoration-muted/60" : ""}`}
-      >
-        {item.text}
+      <div className="min-w-0 flex-1">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className={`block w-full text-left transition ${done ? "text-muted line-through decoration-muted/60" : ""}`}
+        >
+          {item.text}
+        </button>
         {item.recur && (
-          <span className="mt-0.5 flex items-center gap-1 text-xs text-muted no-underline">
-            <span aria-hidden>🔁</span>
+          <span className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+            <Icon name="repeat" className="h-3 w-3" strokeWidth={2.2} />
             {recurLabel(item.recur)}
             {done && item.reappearAt && <> · volta {new Date(item.reappearAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}</>}
           </span>
         )}
-      </button>
+      </div>
       <button
         onClick={() => setEditing(true)}
         className="icon-btn !h-8 !w-8 opacity-60 md:opacity-0 md:group-hover:opacity-100"
