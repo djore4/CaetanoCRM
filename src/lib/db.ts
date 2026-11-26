@@ -1,5 +1,11 @@
 import { supabaseBrowser } from "./supabase/client";
-import type { Category, Expense, HomeList, ListItem, Settlement, UserId } from "./types";
+import type { Category, Expense, HomeList, ListItem, Recurrence, Settlement, UserId } from "./types";
+
+/** Intervalo em dias entre repetições: "a cada N dias" ou "N vezes por semana/mês" (espaçadas por igual). */
+export function recurDays(r: Recurrence): number {
+  const period = r.kind === "days" ? r.n : (r.kind === "week" ? 7 : 30) / r.n;
+  return Math.max(1, Math.round(period));
+}
 
 /** Camada de dados (Supabase). As políticas RLS garantem que só os 2 membros acedem. */
 
@@ -109,22 +115,34 @@ export const db = {
   },
 
   /* ----- listas ----- */
+  /** Itens recorrentes feitos cujo prazo passou voltam a "por fazer". */
+  async reviveDue() {
+    const s = supabaseBrowser();
+    await s
+      .from("casa_list_items")
+      .update({ done: false, reappear_at: null })
+      .eq("done", true)
+      .not("recur_kind", "is", null)
+      .lte("reappear_at", new Date().toISOString());
+  },
   async lists(): Promise<HomeList[]> {
+    await db.reviveDue();
     const s = supabaseBrowser();
     const rows = check(
       await s
         .from("casa_lists")
-        .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at)")
+        .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at,recur_kind,recur_n,reappear_at)")
         .order("created_at"),
       "lists",
     ) as any[];
     return rows.map(toList);
   },
   async list(id: string): Promise<HomeList | null> {
+    await db.reviveDue();
     const s = supabaseBrowser();
     const { data } = await s
       .from("casa_lists")
-      .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at)")
+      .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at,recur_kind,recur_n,reappear_at)")
       .eq("id", id)
       .maybeSingle();
     return data ? toList(data) : null;
@@ -142,13 +160,33 @@ export const db = {
     const s = supabaseBrowser();
     check(await s.from("casa_lists").delete().eq("id", id), "removeList");
   },
-  async addItems(listId: string, texts: string[]) {
+  async addItems(listId: string, texts: string[], recur?: Recurrence | null) {
     const s = supabaseBrowser();
-    check(await s.from("casa_list_items").insert(texts.map((text) => ({ list_id: listId, text }))), "addItems");
+    check(
+      await s
+        .from("casa_list_items")
+        .insert(texts.map((text) => ({ list_id: listId, text, recur_kind: recur?.kind ?? null, recur_n: recur?.n ?? null }))),
+      "addItems",
+    );
   },
-  async updateItem(itemId: string, patch: { text?: string; done?: boolean }) {
+  async updateItem(itemId: string, patch: { text?: string; done?: boolean; recur?: Recurrence | null }) {
     const s = supabaseBrowser();
-    check(await s.from("casa_list_items").update(patch).eq("id", itemId), "updateItem");
+    const row: Record<string, unknown> = {};
+    if (patch.text !== undefined) row.text = patch.text;
+    if (patch.done !== undefined) row.done = patch.done;
+    if (patch.recur !== undefined) {
+      row.recur_kind = patch.recur?.kind ?? null;
+      row.recur_n = patch.recur?.n ?? null;
+      if (!patch.recur) row.reappear_at = null;
+    }
+    check(await s.from("casa_list_items").update(row).eq("id", itemId), "updateItem");
+  },
+  /** Marca/desmarca. Se for recorrente, ao concluir agenda o regresso a "por fazer". */
+  async toggleItem(item: ListItem, done: boolean) {
+    const s = supabaseBrowser();
+    const reappear =
+      done && item.recur ? new Date(Date.now() + recurDays(item.recur) * 86_400_000).toISOString() : null;
+    check(await s.from("casa_list_items").update({ done, reappear_at: reappear }).eq("id", item.id), "toggleItem");
   },
   async removeItem(itemId: string) {
     const s = supabaseBrowser();
@@ -163,6 +201,19 @@ export const db = {
 function toList(r: any): HomeList {
   const items: ListItem[] = [...r.casa_list_items]
     .sort((a: any, b: any) => a.created_at.localeCompare(b.created_at))
-    .map((i: any) => ({ id: i.id, text: i.text, done: i.done }));
+    .map(
+      (i: any): ListItem => ({
+        id: i.id,
+        text: i.text,
+        done: i.done,
+        recur: i.recur_kind ? { kind: i.recur_kind, n: i.recur_n } : undefined,
+        reappearAt: i.reappear_at ?? undefined,
+      }),
+    );
   return { id: r.id, name: r.name, emoji: r.emoji, items, createdAt: r.created_at };
+}
+
+export function recurLabel(r: Recurrence): string {
+  if (r.kind === "days") return r.n === 1 ? "Todos os dias" : `A cada ${r.n} dias`;
+  return `${r.n}× por ${r.kind === "week" ? "semana" : "mês"}`;
 }

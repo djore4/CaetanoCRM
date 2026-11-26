@@ -34,11 +34,22 @@ export interface Settlement {
   date: string;
 }
 
+export type RecurKind = "days" | "week" | "month";
+
+/** "days": a cada N dias · "week"/"month": N vezes por semana/mês. */
+export interface Recurrence {
+  kind: RecurKind;
+  n: number;
+}
+
 export interface ListItem {
   id: string;
   text: string;
   done: boolean;
   note?: string;
+  recur?: Recurrence;
+  /** Quando um item recorrente feito volta a "por fazer". */
+  reappearAt?: string;
 }
 
 export interface HomeList {

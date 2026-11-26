@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { db } from "@/lib/db";
-import type { ListItem } from "@/lib/types";
+import { db, recurLabel } from "@/lib/db";
+import type { ListItem, Recurrence } from "@/lib/types";
 import { Icon } from "./Icons";
+import { RecurrenceFields } from "./RecurrenceFields";
 
 export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => void }) {
   const [editing, setEditing] = useState(false);
   const [done, setDone] = useState(item.done); // resposta imediata ao toque
   const [gone, setGone] = useState(false);
+  const [recur, setRecur] = useState<Recurrence | null>(item.recur ?? null);
 
   if (gone) return null;
 
@@ -19,16 +21,23 @@ export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => vo
           onSubmit={async (e) => {
             e.preventDefault();
             const text = String(new FormData(e.currentTarget).get("text") ?? "").trim();
-            if (text && text !== item.text) await db.updateItem(item.id, { text });
+            const patch: { text?: string; recur?: Recurrence | null } = {};
+            if (text && text !== item.text) patch.text = text;
+            if (JSON.stringify(recur) !== JSON.stringify(item.recur ?? null)) patch.recur = recur;
+            if (patch.text !== undefined || patch.recur !== undefined) await db.updateItem(item.id, patch);
             setEditing(false);
             onChange();
           }}
-          className="flex gap-2"
+          className="space-y-2"
         >
-          <input name="text" defaultValue={item.text} autoFocus className="input !py-2" onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
-          <button className="btn !px-3.5 !py-2" aria-label="Guardar">
-            <Icon name="check" className="h-4 w-4" strokeWidth={2.6} />
-          </button>
+          <input name="text" defaultValue={item.text} autoFocus className="input !py-2" />
+          <RecurrenceFields value={recur} onChange={setRecur} />
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-ghost flex-1 !py-2" onClick={() => { setRecur(item.recur ?? null); setEditing(false); }}>
+              Cancelar
+            </button>
+            <button className="btn flex-1 !py-2">Guardar</button>
+          </div>
         </form>
       </li>
     );
@@ -40,7 +49,7 @@ export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => vo
         aria-label={done ? "Desmarcar" : "Marcar como feito"}
         onClick={async () => {
           setDone(!done);
-          await db.updateItem(item.id, { done: !done });
+          await db.toggleItem(item, !done);
           onChange();
         }}
         className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition active:scale-90 ${
@@ -56,6 +65,13 @@ export function ItemRow({ item, onChange }: { item: ListItem; onChange: () => vo
         className={`min-w-0 flex-1 text-left transition ${done ? "text-muted line-through decoration-muted/60" : ""}`}
       >
         {item.text}
+        {item.recur && (
+          <span className="mt-0.5 flex items-center gap-1 text-xs text-muted no-underline">
+            <span aria-hidden>🔁</span>
+            {recurLabel(item.recur)}
+            {done && item.reappearAt && <> · volta {new Date(item.reappearAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}</>}
+          </span>
+        )}
       </button>
       <button
         onClick={() => setEditing(true)}
