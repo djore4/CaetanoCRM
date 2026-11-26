@@ -34,11 +34,12 @@ export interface Settlement {
   date: string;
 }
 
-export type RecurKind = "days" | "week" | "month";
+export type RecurUnit = "day" | "week" | "month";
 
-/** "days": a cada N dias · "week"/"month": N vezes por semana/mês. */
+/** "every": a cada N dias/semanas/meses · "times": N vezes por semana/mês. */
 export interface Recurrence {
-  kind: RecurKind;
+  mode: "every" | "times";
+  unit: RecurUnit;
   n: number;
 }
 

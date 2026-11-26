@@ -1,10 +1,40 @@
 import { supabaseBrowser } from "./supabase/client";
 import type { Category, Expense, HomeList, ListItem, Recurrence, Settlement, UserId } from "./types";
 
-/** Intervalo em dias entre repetições: "a cada N dias" ou "N vezes por semana/mês" (espaçadas por igual). */
-export function recurDays(r: Recurrence): number {
-  const period = r.kind === "days" ? r.n : (r.kind === "week" ? 7 : 30) / r.n;
-  return Math.max(1, Math.round(period));
+/** Data em que um item concluído em `from` volta a "por fazer". */
+export function nextReappear(r: Recurrence, from = new Date()): Date {
+  const d = new Date(from);
+  if (r.mode === "every") {
+    if (r.unit === "day") d.setDate(d.getDate() + r.n);
+    else if (r.unit === "week") d.setDate(d.getDate() + 7 * r.n);
+    else d.setMonth(d.getMonth() + r.n);
+  } else {
+    d.setDate(d.getDate() + timesGapDays(r));
+  }
+  return d;
+}
+
+/** "N vezes por semana/mês": intervalo entre repetições, espaçadas por igual. */
+export function timesGapDays(r: Recurrence): number {
+  return Math.max(1, Math.round((r.unit === "week" ? 7 : 30) / r.n));
+}
+
+const UNIT_ONE = { day: "dia", week: "semana", month: "mês" } as const;
+const UNIT_MANY = { day: "dias", week: "semanas", month: "meses" } as const;
+const EVERY_ONE = { day: "Todos os dias", week: "Todas as semanas", month: "Todos os meses" } as const;
+
+export function recurLabel(r: Recurrence): string {
+  if (r.mode === "times") return `${r.n}× por ${UNIT_ONE[r.unit]}`;
+  return r.n === 1 ? EVERY_ONE[r.unit] : `A cada ${r.n} ${UNIT_MANY[r.unit]}`;
+}
+
+/** Frase que explica quando o item volta. */
+export function recurExplain(r: Recurrence): string {
+  if (r.mode === "times") {
+    const g = timesGapDays(r);
+    return `${r.n}× por ${UNIT_ONE[r.unit]}: volta ${g === 1 ? "no dia seguinte" : `${g} dias depois`} de o concluíres.`;
+  }
+  return `Volta ${r.n === 1 ? `${r.unit === "week" ? "1 semana" : r.unit === "day" ? "1 dia" : "1 mês"}` : `${r.n} ${UNIT_MANY[r.unit]}`} depois de o concluíres.`;
 }
 
 /** Camada de dados (Supabase). As políticas RLS garantem que só os 2 membros acedem. */
@@ -122,7 +152,7 @@ export const db = {
       .from("casa_list_items")
       .update({ done: false, reappear_at: null })
       .eq("done", true)
-      .not("recur_kind", "is", null)
+      .not("recur_n", "is", null)
       .lte("reappear_at", new Date().toISOString());
   },
   async lists(): Promise<HomeList[]> {
@@ -131,7 +161,7 @@ export const db = {
     const rows = check(
       await s
         .from("casa_lists")
-        .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at,recur_kind,recur_n,reappear_at)")
+        .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at,recur_mode,recur_unit,recur_n,reappear_at)")
         .order("created_at"),
       "lists",
     ) as any[];
@@ -142,7 +172,7 @@ export const db = {
     const s = supabaseBrowser();
     const { data } = await s
       .from("casa_lists")
-      .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at,recur_kind,recur_n,reappear_at)")
+      .select("id,name,emoji,created_at,casa_list_items(id,text,done,created_at,recur_mode,recur_unit,recur_n,reappear_at)")
       .eq("id", id)
       .maybeSingle();
     return data ? toList(data) : null;
@@ -165,7 +195,7 @@ export const db = {
     check(
       await s
         .from("casa_list_items")
-        .insert(texts.map((text) => ({ list_id: listId, text, recur_kind: recur?.kind ?? null, recur_n: recur?.n ?? null }))),
+        .insert(texts.map((text) => ({ list_id: listId, text, recur_mode: recur?.mode ?? null, recur_unit: recur?.unit ?? null, recur_n: recur?.n ?? null }))),
       "addItems",
     );
   },
@@ -175,7 +205,8 @@ export const db = {
     if (patch.text !== undefined) row.text = patch.text;
     if (patch.done !== undefined) row.done = patch.done;
     if (patch.recur !== undefined) {
-      row.recur_kind = patch.recur?.kind ?? null;
+      row.recur_mode = patch.recur?.mode ?? null;
+      row.recur_unit = patch.recur?.unit ?? null;
       row.recur_n = patch.recur?.n ?? null;
       if (!patch.recur) row.reappear_at = null;
     }
@@ -185,7 +216,7 @@ export const db = {
   async toggleItem(item: ListItem, done: boolean) {
     const s = supabaseBrowser();
     const reappear =
-      done && item.recur ? new Date(Date.now() + recurDays(item.recur) * 86_400_000).toISOString() : null;
+      done && item.recur ? nextReappear(item.recur).toISOString() : null;
     check(await s.from("casa_list_items").update({ done, reappear_at: reappear }).eq("id", item.id), "toggleItem");
   },
   async removeItem(itemId: string) {
@@ -206,14 +237,9 @@ function toList(r: any): HomeList {
         id: i.id,
         text: i.text,
         done: i.done,
-        recur: i.recur_kind ? { kind: i.recur_kind, n: i.recur_n } : undefined,
+        recur: i.recur_n ? { mode: i.recur_mode, unit: i.recur_unit, n: i.recur_n } : undefined,
         reappearAt: i.reappear_at ?? undefined,
       }),
     );
   return { id: r.id, name: r.name, emoji: r.emoji, items, createdAt: r.created_at };
-}
-
-export function recurLabel(r: Recurrence): string {
-  if (r.kind === "days") return r.n === 1 ? "Todos os dias" : `A cada ${r.n} dias`;
-  return `${r.n}× por ${r.kind === "week" ? "semana" : "mês"}`;
 }
