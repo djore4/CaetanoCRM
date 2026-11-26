@@ -37,8 +37,8 @@ export default function Login() {
       <form onSubmit={onSubmit} className="card enter relative w-full max-w-sm space-y-5 p-7 shadow-[var(--shadow-lg)]">
         <div className="flex flex-col items-center text-center">
           <Logo className="h-14 w-14" />
-          <h1 className="mt-4 text-2xl font-bold tracking-tight">Bem-vindos a casa</h1>
-          <p className="text-sm text-muted">Despesas, contas e listas partilhadas.</p>
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Homi</h1>
+          <p className="text-sm text-muted">Despesas, contas e listas da casa, a dois.</p>
         </div>
         {erro && (
           <p className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-2.5 text-center text-sm font-medium text-danger">

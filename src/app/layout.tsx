@@ -6,14 +6,17 @@ import { THEME_SCRIPT } from "@/lib/theme";
 const BP = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export const metadata: Metadata = {
-  title: "Casa",
-  description: "Despesas e listas partilhadas",
-  applicationName: "Casa",
-  appleWebApp: { capable: true, title: "Casa", statusBarStyle: "default" },
+  title: "Homi",
+  description: "Despesas, conta corrente e listas da casa, a dois.",
+  applicationName: "Homi",
+  appleWebApp: { capable: true, title: "Homi", statusBarStyle: "default" },
   formatDetection: { telephone: false },
   other: { "apple-mobile-web-app-capable": "yes" },
   icons: {
-    icon: [{ url: `${BP}/icons/favicon-64.png`, type: "image/png" }],
+    icon: [
+      { url: `${BP}/icon.svg`, type: "image/svg+xml" },
+      { url: `${BP}/icons/favicon-64.png`, type: "image/png", sizes: "64x64" },
+    ],
     apple: [{ url: `${BP}/icons/apple-touch-icon.png`, sizes: "180x180" }],
   },
 };
