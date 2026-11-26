@@ -95,7 +95,7 @@ export default function Listas() {
         className="card p-4"
       >
         <p className="label px-1">Nova lista</p>
-        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+        <div className="mb-3 flex flex-wrap gap-1.5">
           {EMOJIS.map((e) => (
             <button
               key={e}
