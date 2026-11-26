@@ -7,6 +7,7 @@ import { Icon, Logo, type IconName } from "./Icons";
 const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: "/", label: "Resumo", icon: "chart" },
   { href: "/despesas/", label: "Despesas", icon: "receipt" },
+  { href: "/importar/", label: "Importar", icon: "upload" },
   { href: "/listas/", label: "Listas", icon: "list" },
 ];
 
@@ -50,7 +51,7 @@ export function Nav() {
 
       {/* telemóvel: barra em baixo */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line/70 bg-card/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-3">
+        <div className="mx-auto grid max-w-md grid-cols-4">
           {ITEMS.map((i) => {
             const on = active(i.href);
             return (

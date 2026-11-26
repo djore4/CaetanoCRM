@@ -22,7 +22,7 @@ export interface Expense {
   paidBy: UserId;
   splitPct: number; // % suportada pelo pagador (50 = a meias)
   file?: string; // nome do ficheiro em data/uploads
-  source: "manual" | "ia";
+  source: "manual" | "ia" | "email";
   createdAt: string;
 }
 
@@ -53,4 +53,25 @@ export interface DB {
   expenses: Expense[];
   settlements: Settlement[];
   lists: HomeList[];
+}
+
+export interface Extracted {
+  is_invoice: boolean;
+  supplier: string;
+  category: Category;
+  amount: number;
+  date: string | null;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface ImportItem {
+  id: string;
+  messageId: string;
+  attachmentId: string;
+  status: "pending" | "approved" | "ignored";
+  sender: string;
+  subject: string;
+  receivedAt: string;
+  extracted: Extracted;
+  file?: string;
 }

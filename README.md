@@ -38,6 +38,18 @@ Uma vez: *Settings → Pages → Build and deployment → Source: **GitHub Actio
 
 A chave publicável e o URL do Supabase estão no workflow (são públicos por desenho). Rotas dinâmicas usam query string (`/listas/ver/?id=…`, `/despesas/editar/?id=…`).
 
+## Importar faturas do email (Hotmail/Outlook)
+
+Página **Importar**: ligas o email (Microsoft, só leitura), a app procura nos últimos 45 dias emails com PDF/imagem ou palavras como fatura/recibo/pagamento, a Claude extrai fornecedor, categoria, valor e data, e cada fatura aparece numa **fila de revisão** (editar / lançar 50/50 / ignorar). Nada vira despesa sem carregares em *Lançar*. Emails já tratados (lançados ou ignorados) não voltam a aparecer.
+
+Configuração (uma vez):
+
+1. **Azure** (portal.azure.com → App registrations → New): contas *pessoais* Microsoft; plataforma *Single-page application* com redirect URI `https://<user>.github.io/<repo>/importar/` (e `http://localhost:3000/importar/` para dev); permissão delegada `Mail.Read`. Copia o *Application (client) ID*.
+2. GitHub → Settings → Variables → Actions: `MS_CLIENT_ID` = esse ID (local: `NEXT_PUBLIC_MS_CLIENT_ID` em `.env.local`).
+3. Supabase: aplicar a migração `20261126000000_casa_email_import.sql`; `supabase secrets set ANTHROPIC_API_KEY=...`; `supabase functions deploy extract-invoice`.
+
+Limites conhecidos: só lê faturas que vêm **anexadas ou no corpo** do email (avisos tipo "fatura disponível no portal" só com link não são lidos); a sessão Microsoft dura enquanto o separador estiver aberto; o conteúdo dos emails candidatos é enviado à API da Anthropic para extração.
+
 ## Estado
 
 A leitura automática de faturas (Claude) foi removida ao passar para site estático: precisaria de um servidor para guardar a chave. Splitwise foi substituído: o saldo é calculado na app a partir das despesas (pagador + divisão) e dos acertos. Ainda não testado contra uma base real; sem testes automáticos, sem despesas recorrentes, sem importação do histórico do Splitwise.

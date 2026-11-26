@@ -1,5 +1,5 @@
 import { supabaseBrowser } from "./supabase/client";
-import type { Category, Expense, HomeList, ListItem, Settlement, UserId } from "./types";
+import type { Category, Expense, ImportItem, Extracted, HomeList, ListItem, Settlement, UserId } from "./types";
 
 /** Camada de dados (Supabase). As políticas RLS garantem que só os 2 membros acedem. */
 
@@ -61,9 +61,9 @@ export const db = {
     const { data } = await s.from("casa_expenses").select("*").eq("id", id).maybeSingle();
     return data ? toExpense(data) : null;
   },
-  async addExpense(e: Omit<Expense, "id" | "createdAt">) {
+  async addExpense(e: Omit<Expense, "id" | "createdAt">): Promise<string> {
     const s = supabaseBrowser();
-    check(
+    const row = check(
       await s.from("casa_expenses").insert({
         description: e.description,
         category: e.category,
@@ -73,9 +73,10 @@ export const db = {
         split_pct: e.splitPct,
         file_path: e.file ?? null,
         source: e.source,
-      }),
+      }).select("id").single(),
       "addExpense",
     );
+    return (row as any).id;
   },
   async updateExpense(id: string, e: Partial<Omit<Expense, "id" | "createdAt">>) {
     const s = supabaseBrowser();
@@ -93,6 +94,57 @@ export const db = {
     const { data } = await s.from("casa_expenses").select("file_path").eq("id", id).maybeSingle();
     check(await s.from("casa_expenses").delete().eq("id", id), "removeExpense");
     if (data?.file_path) await s.storage.from("casa-invoices").remove([data.file_path]);
+  },
+
+  /* ----- importação de faturas do email ----- */
+  async importItems(status: ImportItem["status"]): Promise<ImportItem[]> {
+    const s = supabaseBrowser();
+    const rows = check(
+      await s.from("casa_import_items").select("*").eq("status", status).order("received_at", { ascending: false }),
+      "importItems",
+    ) as any[];
+    return rows.map(toImportItem);
+  },
+  /** Ids de mensagens já tratadas (qualquer estado): não voltam a ser processadas. */
+  async importedMessageIds(): Promise<Set<string>> {
+    const s = supabaseBrowser();
+    const rows = check(await s.from("casa_import_items").select("message_id"), "importedMessageIds") as any[];
+    return new Set(rows.map((r) => r.message_id as string));
+  },
+  async addImportItem(x: {
+    messageId: string;
+    attachmentId: string;
+    sender: string;
+    subject: string;
+    receivedAt: string;
+    extracted: Extracted;
+    file?: string;
+    ignored: boolean;
+  }) {
+    const s = supabaseBrowser();
+    check(
+      await s.from("casa_import_items").upsert(
+        {
+          message_id: x.messageId,
+          attachment_id: x.attachmentId,
+          status: x.ignored ? "ignored" : "pending",
+          sender: x.sender,
+          subject: x.subject,
+          received_at: x.receivedAt,
+          extracted: x.extracted,
+          file_path: x.file ?? null,
+        },
+        { onConflict: "message_id,attachment_id", ignoreDuplicates: true },
+      ),
+      "addImportItem",
+    );
+  },
+  async setImportStatus(id: string, status: ImportItem["status"], expenseId?: string) {
+    const s = supabaseBrowser();
+    check(
+      await s.from("casa_import_items").update({ status, expense_id: expenseId ?? null }).eq("id", id),
+      "setImportStatus",
+    );
   },
 
   /* ----- acertos de contas ----- */
@@ -159,6 +211,18 @@ export const db = {
     check(await s.from("casa_list_items").delete().eq("list_id", listId).eq("done", true), "clearDone");
   },
 };
+
+const toImportItem = (r: any): ImportItem => ({
+  id: r.id,
+  messageId: r.message_id,
+  attachmentId: r.attachment_id,
+  status: r.status,
+  sender: r.sender ?? "",
+  subject: r.subject ?? "",
+  receivedAt: r.received_at ?? "",
+  extracted: r.extracted as Extracted,
+  file: r.file_path ?? undefined,
+});
 
 function toList(r: any): HomeList {
   const items: ListItem[] = [...r.casa_list_items]
