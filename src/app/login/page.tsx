@@ -32,7 +32,7 @@ export default function Login() {
       />
       <div
         className="pointer-events-none absolute -bottom-40 -right-24 h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
-        style={{ background: "var(--accent-2)" }}
+        style={{ background: "#ff8f6b" }}
       />
       <form onSubmit={onSubmit} className="card enter relative w-full max-w-sm space-y-5 p-7 shadow-[var(--shadow-lg)]">
         <div className="flex flex-col items-center text-center">
