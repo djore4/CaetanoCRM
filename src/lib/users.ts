@@ -1,7 +1,7 @@
 import { db } from "./db";
 import type { UserId } from "./types";
 
-export const USER_COLORS: Record<UserId, string> = { a: "#5b6cf0", b: "#e2508a" };
+export const USER_COLORS: Record<UserId, string> = { a: "#e8603f", b: "#1f9a80" };
 
 export const other = (u: UserId): UserId => (u === "a" ? "b" : "a");
 
